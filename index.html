@@ -72,14 +72,69 @@
         </div>
       </section>
 
-      <!-- Sessions Section (placeholder) -->
+      <!-- Sessions Section -->
       <section id="section-sessions" class="section">
-        <div class="section-header">
-          <h1>Sessions</h1>
+
+        <!-- List view -->
+        <div id="sessions-list-view">
+          <div class="section-header">
+            <h1>Sessions</h1>
+            <button id="btn-new-session" class="btn-primary">+ New Session</button>
+          </div>
+          <p class="section-subtitle">Your game session logs.</p>
+          <div id="sessions-list"></div>
+          <div id="sessions-empty" class="empty-state" style="display:none;">
+            <span class="empty-icon">&#128203;</span>
+            <p>No sessions yet. Start your first one!</p>
+          </div>
         </div>
-        <div class="empty-state">
-          <span class="empty-icon">&#128203;</span>
-          <p>Session logs coming soon.</p>
+
+        <!-- Editor view -->
+        <div id="sessions-editor-view" style="display:none;">
+          <div class="session-editor-header">
+            <button id="btn-back-session" class="btn-back">&#8592; Back</button>
+            <input id="session-title-input" class="session-title-input" type="text" placeholder="Session title..." />
+            <input id="session-date-input" type="date" class="session-date-input" />
+            <select id="session-system-select" class="session-system-select">
+              <option value="">&#8212; No system &#8212;</option>
+            </select>
+            <div class="editor-actions">
+              <button id="btn-delete-session" class="btn-danger">Delete</button>
+              <button id="btn-save-session" class="btn-primary">Save</button>
+            </div>
+          </div>
+
+          <div class="session-editor-body">
+            <!-- Notes panel -->
+            <div class="notes-panel">
+              <div class="panel-tabs">
+                <button class="tab-btn active" data-tab="edit">Edit</button>
+                <button class="tab-btn" data-tab="preview">Preview</button>
+              </div>
+              <textarea id="session-notes" class="notes-editor" spellcheck="false"
+                placeholder="Write session notes in Markdown..."></textarea>
+              <div id="session-notes-preview" class="notes-preview" style="display:none;"></div>
+            </div>
+
+            <!-- Initiative tracker -->
+            <div class="initiative-panel">
+              <div class="initiative-header">
+                <h3>Initiative</h3>
+                <button id="btn-clear-combat" class="btn-ghost-sm">Clear</button>
+              </div>
+              <div id="combatants-list" class="combatants-list"></div>
+              <div class="initiative-footer">
+                <button id="btn-next-turn" class="btn-primary btn-block">&#9654; Next Turn</button>
+                <div class="add-combatant-form">
+                  <input id="combatant-name" type="text" placeholder="Name" class="combatant-name-input" />
+                  <input id="combatant-init" type="number" placeholder="0" class="combatant-init-input" />
+                  <button id="btn-add-combatant" class="btn-primary">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="session-editor-status" class="editor-status"></div>
         </div>
       </section>
 

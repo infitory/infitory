@@ -336,5 +336,430 @@ function formatDate(iso) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// ── Sessions ─────────────────────────────────────────────────
+
+const SESSION_PREFIX = 'session:';
+
+// State
+let currentSessionId = null;
+let sessionUnsaved = false;
+let combatState = { combatants: [], currentTurn: 0 };
+
+// DOM refs
+const sessionsSection      = document.getElementById('section-sessions');
+const sessionsListView     = document.getElementById('sessions-list-view');
+const sessionsEditorView   = document.getElementById('sessions-editor-view');
+const sessionsList         = document.getElementById('sessions-list');
+const sessionsEmpty        = document.getElementById('sessions-empty');
+const btnNewSession        = document.getElementById('btn-new-session');
+const btnBackSession       = document.getElementById('btn-back-session');
+const btnSaveSession       = document.getElementById('btn-save-session');
+const btnDeleteSession     = document.getElementById('btn-delete-session');
+const sessionTitleInput    = document.getElementById('session-title-input');
+const sessionDateInput     = document.getElementById('session-date-input');
+const sessionSystemSelect  = document.getElementById('session-system-select');
+const sessionNotes         = document.getElementById('session-notes');
+const sessionNotesPreview  = document.getElementById('session-notes-preview');
+const sessionEditorStatus  = document.getElementById('session-editor-status');
+const combatantsList       = document.getElementById('combatants-list');
+const btnNextTurn          = document.getElementById('btn-next-turn');
+const btnClearCombat       = document.getElementById('btn-clear-combat');
+const combatantNameInput   = document.getElementById('combatant-name');
+const combatantInitInput   = document.getElementById('combatant-init');
+const btnAddCombatant      = document.getElementById('btn-add-combatant');
+
+// ── Session storage helpers ───────────────────────────────────
+
+function newId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function allSessionKeys() {
+  return Object.keys(localStorage).filter(k => k.startsWith(SESSION_PREFIX));
+}
+
+function loadSessionData(id) {
+  const raw = localStorage.getItem(SESSION_PREFIX + id);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+function saveSessionData(data) {
+  localStorage.setItem(SESSION_PREFIX + data.id, JSON.stringify(data));
+}
+
+function deleteSessionData(id) {
+  localStorage.removeItem(SESSION_PREFIX + id);
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatSessionDate(str) {
+  if (!str) return '';
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function getSystemName(key) {
+  if (!key) return null;
+  const d = loadSystem(key);
+  return d ? d.name : keyToDisplayName(key);
+}
+
+// ── Sessions list ─────────────────────────────────────────────
+
+function renderSessionsList() {
+  const keys = allSessionKeys();
+  sessionsList.innerHTML = '';
+
+  if (keys.length === 0) {
+    sessionsEmpty.style.display = '';
+    sessionsList.style.display = 'none';
+    return;
+  }
+
+  sessionsEmpty.style.display = 'none';
+  sessionsList.style.display = '';
+
+  const items = keys
+    .map(k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const d = (b.date || '').localeCompare(a.date || '');
+      return d !== 0 ? d : (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+
+  items.forEach(data => {
+    const sysName = getSystemName(data.systemKey);
+    const card = document.createElement('div');
+    card.className = 'session-card';
+    card.innerHTML = `
+      <div class="session-card-info">
+        <span class="session-card-title">${escapeHtml(data.title || 'Untitled')}</span>
+        <span class="session-card-date">${formatSessionDate(data.date) || 'No date'}</span>
+      </div>
+      ${sysName ? `<span class="session-card-system">${escapeHtml(sysName)}</span>` : ''}
+      <span class="session-card-arrow">&#8250;</span>
+    `;
+    card.addEventListener('click', () => openSessionEditor(data.id));
+    sessionsList.appendChild(card);
+  });
+}
+
+// ── Session editor ────────────────────────────────────────────
+
+function populateSystemSelect() {
+  const current = sessionSystemSelect.value;
+  sessionSystemSelect.innerHTML = '<option value="">\u2014 No system \u2014</option>';
+  allSystemKeys().forEach(k => {
+    const d = loadSystem(k);
+    if (!d) return;
+    const opt = document.createElement('option');
+    opt.value = k;
+    opt.textContent = d.name;
+    sessionSystemSelect.appendChild(opt);
+  });
+  sessionSystemSelect.value = current;
+}
+
+function openSessionEditor(id) {
+  const data = loadSessionData(id);
+  if (!data) return;
+
+  currentSessionId = id;
+  sessionTitleInput.value = data.title || '';
+  sessionDateInput.value = data.date || todayISO();
+  populateSystemSelect();
+  sessionSystemSelect.value = data.systemKey || '';
+  sessionNotes.value = data.notes || '';
+  combatState = data.combat
+    ? { combatants: [...(data.combat.combatants || [])], currentTurn: data.combat.currentTurn || 0 }
+    : { combatants: [], currentTurn: 0 };
+
+  setSessionUnsaved(false);
+  switchNotesTab('edit');
+  renderCombatants();
+
+  sessionsListView.style.display = 'none';
+  sessionsEditorView.style.display = 'flex';
+  sessionsSection.classList.add('editor-mode');
+  sessionTitleInput.focus();
+  sessionTitleInput.select();
+}
+
+function closeSessionEditor() {
+  currentSessionId = null;
+  combatState = { combatants: [], currentTurn: 0 };
+  setSessionUnsaved(false);
+  sessionsEditorView.style.display = 'none';
+  sessionsListView.style.display = '';
+  sessionsSection.classList.remove('editor-mode');
+  renderSessionsList();
+}
+
+function setSessionUnsaved(state) {
+  sessionUnsaved = state;
+  if (state) {
+    sessionEditorStatus.textContent = 'Unsaved changes';
+    sessionEditorStatus.className = 'editor-status status-unsaved';
+  } else {
+    sessionEditorStatus.textContent = '';
+    sessionEditorStatus.className = 'editor-status';
+  }
+}
+
+function saveCurrentSession() {
+  if (!currentSessionId) return;
+  const existing = loadSessionData(currentSessionId) || {};
+  const data = {
+    ...existing,
+    id: currentSessionId,
+    title: sessionTitleInput.value.trim() || 'Untitled',
+    date: sessionDateInput.value || todayISO(),
+    systemKey: sessionSystemSelect.value,
+    notes: sessionNotes.value,
+    combat: { combatants: [...combatState.combatants], currentTurn: combatState.currentTurn },
+    updatedAt: new Date().toISOString(),
+  };
+  saveSessionData(data);
+  setSessionUnsaved(false);
+  flashSessionStatus('Saved.', 'status-saved');
+}
+
+function flashSessionStatus(msg, cls) {
+  sessionEditorStatus.textContent = msg;
+  sessionEditorStatus.className = 'editor-status ' + cls;
+  setTimeout(() => {
+    if (!sessionUnsaved) {
+      sessionEditorStatus.textContent = '';
+      sessionEditorStatus.className = 'editor-status';
+    }
+  }, 2000);
+}
+
+function autosaveCombat() {
+  if (!currentSessionId) return;
+  const data = loadSessionData(currentSessionId);
+  if (!data) return;
+  data.combat = { combatants: [...combatState.combatants], currentTurn: combatState.currentTurn };
+  data.updatedAt = new Date().toISOString();
+  saveSessionData(data);
+}
+
+// ── Notes tabs ────────────────────────────────────────────────
+
+function switchNotesTab(tab) {
+  document.querySelectorAll('#section-sessions .tab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab)
+  );
+  if (tab === 'preview') {
+    sessionNotesPreview.innerHTML = renderMarkdown(sessionNotes.value);
+    sessionNotesPreview.style.display = '';
+    sessionNotes.style.display = 'none';
+  } else {
+    sessionNotes.style.display = '';
+    sessionNotesPreview.style.display = 'none';
+    sessionNotes.focus();
+  }
+}
+
+document.querySelectorAll('#section-sessions .tab-btn').forEach(btn =>
+  btn.addEventListener('click', () => switchNotesTab(btn.dataset.tab))
+);
+
+// ── Markdown renderer ─────────────────────────────────────────
+
+function renderMarkdown(md) {
+  if (!md || !md.trim()) return '<p class="md-empty">Nothing to preview.</p>';
+
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  function inline(s) {
+    return s
+      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/_(.+?)_/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  }
+
+  const out = [];
+  let inUl = false, inOl = false;
+
+  function closeLists() {
+    if (inUl) { out.push('</ul>'); inUl = false; }
+    if (inOl) { out.push('</ol>'); inOl = false; }
+  }
+
+  for (const line of md.split('\n')) {
+    const e = esc(line);
+    let m;
+
+    if ((m = e.match(/^### (.+)/)))       { closeLists(); out.push(`<h3>${inline(m[1])}</h3>`); }
+    else if ((m = e.match(/^## (.+)/)))   { closeLists(); out.push(`<h2>${inline(m[1])}</h2>`); }
+    else if ((m = e.match(/^# (.+)/)))    { closeLists(); out.push(`<h1>${inline(m[1])}</h1>`); }
+    else if (/^---+$/.test(e.trim()))     { closeLists(); out.push('<hr>'); }
+    else if ((m = e.match(/^&gt; (.*)/))) { closeLists(); out.push(`<blockquote>${inline(m[1])}</blockquote>`); }
+    else if ((m = line.match(/^[-*] (.*)/))) {
+      if (inOl) { out.push('</ol>'); inOl = false; }
+      if (!inUl) { out.push('<ul>'); inUl = true; }
+      out.push(`<li>${inline(esc(m[1]))}</li>`);
+    }
+    else if ((m = line.match(/^\d+\. (.*)/))) {
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (!inOl) { out.push('<ol>'); inOl = true; }
+      out.push(`<li>${inline(esc(m[1]))}</li>`);
+    }
+    else if (line.trim() === '') { closeLists(); out.push(''); }
+    else { closeLists(); out.push(`<p>${inline(e)}</p>`); }
+  }
+  closeLists();
+  return out.join('\n');
+}
+
+// ── Initiative tracker ────────────────────────────────────────
+
+function renderCombatants() {
+  combatantsList.innerHTML = '';
+
+  if (combatState.combatants.length === 0) {
+    const el = document.createElement('div');
+    el.className = 'combatants-empty';
+    el.textContent = 'No combatants. Add one below.';
+    combatantsList.appendChild(el);
+    btnNextTurn.disabled = true;
+    return;
+  }
+
+  btnNextTurn.disabled = false;
+  combatState.combatants.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'combatant-row' + (i === combatState.currentTurn ? ' active' : '');
+    row.innerHTML = `
+      <span class="combatant-turn-marker">${i === combatState.currentTurn ? '&#9654;' : ''}</span>
+      <span class="combatant-name-label">${escapeHtml(c.name)}</span>
+      <span class="combatant-init-label">${c.initiative}</span>
+      <button class="combatant-remove" data-id="${c.id}" title="Remove">&#215;</button>
+    `;
+    combatantsList.appendChild(row);
+  });
+
+  const activeRow = combatantsList.querySelector('.combatant-row.active');
+  if (activeRow) activeRow.scrollIntoView({ block: 'nearest' });
+}
+
+function addCombatant(name, initiative) {
+  const c = { id: newId(), name: name.trim(), initiative: Number(initiative) || 0 };
+  const idx = combatState.combatants.findIndex(x => x.initiative < c.initiative);
+  if (idx === -1) {
+    combatState.combatants.push(c);
+  } else {
+    combatState.combatants.splice(idx, 0, c);
+    if (idx <= combatState.currentTurn && combatState.combatants.length > 1) {
+      combatState.currentTurn++;
+    }
+  }
+  renderCombatants();
+  autosaveCombat();
+}
+
+function removeCombatant(id) {
+  const idx = combatState.combatants.findIndex(c => c.id === id);
+  if (idx === -1) return;
+  combatState.combatants.splice(idx, 1);
+  if (combatState.combatants.length === 0) {
+    combatState.currentTurn = 0;
+  } else if (idx < combatState.currentTurn) {
+    combatState.currentTurn = Math.max(0, combatState.currentTurn - 1);
+  } else if (combatState.currentTurn >= combatState.combatants.length) {
+    combatState.currentTurn = 0;
+  }
+  renderCombatants();
+  autosaveCombat();
+}
+
+function nextTurn() {
+  if (!combatState.combatants.length) return;
+  combatState.currentTurn = (combatState.currentTurn + 1) % combatState.combatants.length;
+  renderCombatants();
+  autosaveCombat();
+}
+
+function clearCombat() {
+  combatState = { combatants: [], currentTurn: 0 };
+  renderCombatants();
+  autosaveCombat();
+}
+
+// ── Session event listeners ───────────────────────────────────
+
+btnNewSession.addEventListener('click', () => {
+  const id = newId();
+  saveSessionData({
+    id,
+    title: 'New Session',
+    date: todayISO(),
+    systemKey: '',
+    notes: '',
+    combat: { combatants: [], currentTurn: 0 },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  openSessionEditor(id);
+});
+
+btnBackSession.addEventListener('click', () => {
+  if (sessionUnsaved && !confirm('You have unsaved changes. Discard and go back?')) return;
+  closeSessionEditor();
+});
+
+btnSaveSession.addEventListener('click', saveCurrentSession);
+
+btnDeleteSession.addEventListener('click', () => {
+  if (!currentSessionId) return;
+  const title = sessionTitleInput.value.trim() || 'this session';
+  if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+  deleteSessionData(currentSessionId);
+  closeSessionEditor();
+});
+
+sessionTitleInput.addEventListener('input', () => setSessionUnsaved(true));
+sessionDateInput.addEventListener('change', () => setSessionUnsaved(true));
+sessionSystemSelect.addEventListener('change', () => setSessionUnsaved(true));
+sessionNotes.addEventListener('input', () => setSessionUnsaved(true));
+
+btnNextTurn.addEventListener('click', nextTurn);
+
+btnClearCombat.addEventListener('click', () => {
+  if (combatState.combatants.length && !confirm('Clear all combatants?')) return;
+  clearCombat();
+});
+
+combatantsList.addEventListener('click', e => {
+  const btn = e.target.closest('.combatant-remove');
+  if (btn) removeCombatant(btn.dataset.id);
+});
+
+btnAddCombatant.addEventListener('click', () => {
+  const name = combatantNameInput.value.trim();
+  if (!name) { combatantNameInput.focus(); return; }
+  addCombatant(name, combatantInitInput.value);
+  combatantNameInput.value = '';
+  combatantInitInput.value = '';
+  combatantNameInput.focus();
+});
+
+combatantNameInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && combatantNameInput.value.trim()) combatantInitInput.focus();
+});
+
+combatantInitInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') btnAddCombatant.click();
+});
+
 // ── Init ─────────────────────────────────────────────────────
 renderSystemsList();
+renderSessionsList();
