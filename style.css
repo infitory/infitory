@@ -1038,3 +1038,281 @@ body { background: var(--content-bg); color: var(--text-primary); overflow: hidd
   text-align: right;
   flex-shrink: 0;
 }
+
+/* ── Hamburger (mobile only) ──────────────────────────────── */
+#hamburger {
+  display: none;
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 300;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-sidebar);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+#hamburger:hover { background: var(--sidebar-hover); }
+
+#mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 199;
+}
+
+/* ── Home Dashboard ───────────────────────────────────────── */
+.campaign-name-input {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  border-bottom: 2px solid transparent;
+  padding: 4px 0 6px;
+  margin-bottom: 28px;
+  transition: border-color var(--transition);
+}
+.campaign-name-input:focus { border-bottom-color: var(--accent); }
+.campaign-name-input::placeholder { color: var(--card-border); }
+
+.home-stats {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  flex: 1;
+  min-width: 100px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.stat-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 10px rgba(124, 106, 247, 0.12);
+}
+
+.stat-number {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.home-panels {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.home-panel {
+  flex: 1;
+  min-width: 180px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-panel-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* Quick d20 button */
+.quick-d20-btn {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--editor-bg);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: border-color var(--transition), transform var(--transition);
+  width: 100%;
+}
+.quick-d20-btn:hover { border-color: var(--accent); }
+.quick-d20-btn:active { transform: scale(0.97); }
+
+@keyframes d20Spin {
+  0%   { transform: scale(1) rotate(0deg); }
+  40%  { transform: scale(1.15) rotate(-8deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.quick-d20-btn.rolling { animation: d20Spin 0.3s ease; }
+
+.quick-d20-label {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--editor-text);
+  font-family: var(--font-ui);
+  min-width: 44px;
+}
+
+.quick-d20-result {
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  line-height: 1;
+  min-width: 44px;
+}
+
+/* Data panel */
+.home-data-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Recent sessions */
+.home-recent { margin-bottom: 24px; }
+
+.home-recent-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.home-session-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.home-session-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 10px rgba(124, 106, 247, 0.1);
+}
+
+.home-session-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-session-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-session-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.home-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.prebuilt-notice {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+.prebuilt-notice code {
+  background: var(--sidebar-active);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+/* ── Mobile ───────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  body { overflow: auto; }
+
+  #hamburger { display: flex; }
+
+  #mobile-overlay { display: block; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+  #app.sidebar-open #mobile-overlay { opacity: 1; pointer-events: auto; }
+
+  #sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.35);
+  }
+  #app.sidebar-open #sidebar { transform: translateX(0); }
+
+  #content { height: 100vh; overflow-y: auto; }
+
+  .section { padding: 56px 20px 24px; }
+  #section-sessions.editor-mode { padding: 0; }
+
+  /* Session editor stacks vertically on mobile */
+  .session-editor-header { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+  .session-title-input { min-width: 100%; order: -1; }
+  .session-editor-body { flex-direction: column; }
+  .notes-panel { min-height: 300px; border-right: none; border-bottom: 1px solid var(--card-border); }
+  .initiative-panel { width: 100%; }
+
+  /* Dice roller stacks on mobile */
+  .dice-layout { flex-direction: column; }
+  .dice-history-panel { width: 100%; }
+  .dice-quick-grid { gap: 8px; }
+  .dice-btn { width: 56px; height: 56px; font-size: 15px; }
+
+  /* Home stats full-width row */
+  .home-stats { gap: 8px; }
+  .stat-card { min-width: 80px; }
+  .home-panels { flex-direction: column; }
+}

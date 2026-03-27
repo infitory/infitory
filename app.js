@@ -60,7 +60,7 @@ const STARTER_TEMPLATE = `## System name
 `;
 
 // ── State ────────────────────────────────────────────────────
-let currentSection = 'systems';
+let currentSection = 'home';
 let currentSystemKey = null; // storage key of the system being edited
 let unsavedChanges = false;
 
@@ -89,8 +89,15 @@ navItems.forEach(btn => {
     const target = btn.dataset.section;
     if (target === currentSection) return;
 
-    if (currentSection === 'systems' && !systemsListView.style.display.includes('none') === false) {
-      // in editor; warn about unsaved
+    // Warn on unsaved system edits
+    if (currentSystemKey && unsavedChanges) {
+      if (!confirm('You have unsaved system changes. Discard?')) return;
+      closeEditor();
+    }
+    // Warn on unsaved session edits
+    if (currentSessionId && sessionUnsaved) {
+      if (!confirm('You have unsaved session changes. Discard?')) return;
+      closeSessionEditor();
     }
 
     navItems.forEach(b => b.classList.remove('active'));
@@ -100,6 +107,8 @@ navItems.forEach(btn => {
     document.getElementById('section-' + target).classList.add('active');
 
     currentSection = target;
+
+    if (target === 'home') renderHomeDashboard();
   });
 });
 
@@ -247,11 +256,12 @@ systemNameInput.addEventListener('input', () => setUnsaved(true));
 
 btnSave.addEventListener('click', saveCurrentSystem);
 
-// Ctrl+S / Cmd+S to save
+// Ctrl+S / Cmd+S to save (systems or sessions)
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault();
     if (currentSystemKey) saveCurrentSystem();
+    else if (currentSessionId) saveCurrentSession();
   }
 });
 
@@ -870,6 +880,239 @@ btnClearDiceHistory.addEventListener('click', () => {
   diceResultCard.style.display = 'none';
 });
 
+// ── Home Dashboard ────────────────────────────────────────────
+
+const CAMPAIGN_NAME_KEY = 'app:campaignName';
+
+const campaignNameInput  = document.getElementById('campaign-name-input');
+const statSystemsEl      = document.getElementById('stat-systems');
+const statSessionsEl     = document.getElementById('stat-sessions');
+const statCharactersEl   = document.getElementById('stat-characters');
+const btnQuickD20        = document.getElementById('btn-quick-d20');
+const quickD20Result     = document.getElementById('quick-d20-result');
+const homeRecentList     = document.getElementById('home-recent-list');
+const btnExportAll       = document.getElementById('btn-export-all');
+const btnImportData      = document.getElementById('btn-import-data');
+const importFileInput    = document.getElementById('import-file-input');
+const prebuiltNotice     = document.getElementById('prebuilt-notice');
+
+function renderHomeDashboard() {
+  campaignNameInput.value = localStorage.getItem(CAMPAIGN_NAME_KEY) || '';
+  statSystemsEl.textContent    = allSystemKeys().length;
+  statSessionsEl.textContent   = allSessionKeys().length;
+  statCharactersEl.textContent = 0;
+
+  // Recent sessions — last 3 by date
+  const recent = allSessionKeys()
+    .map(k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } })
+    .filter(Boolean)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    .slice(0, 3);
+
+  homeRecentList.innerHTML = '';
+  if (recent.length === 0) {
+    homeRecentList.innerHTML = '<p class="home-empty">No sessions yet.</p>';
+  } else {
+    recent.forEach(s => {
+      const sysName = getSystemName(s.systemKey);
+      const card = document.createElement('div');
+      card.className = 'home-session-card';
+      card.innerHTML = `
+        <div class="home-session-info">
+          <span class="home-session-title">${escapeHtml(s.title || 'Untitled')}</span>
+          <span class="home-session-date">${formatSessionDate(s.date) || 'No date'}</span>
+        </div>
+        ${sysName ? `<span class="session-card-system">${escapeHtml(sysName)}</span>` : ''}
+      `;
+      card.addEventListener('click', () => {
+        navItems.forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-section="sessions"]').classList.add('active');
+        sections.forEach(sec => sec.classList.remove('active'));
+        document.getElementById('section-sessions').classList.add('active');
+        currentSection = 'sessions';
+        openSessionEditor(s.id);
+      });
+      homeRecentList.appendChild(card);
+    });
+  }
+}
+
+campaignNameInput.addEventListener('input', () => {
+  localStorage.setItem(CAMPAIGN_NAME_KEY, campaignNameInput.value);
+});
+
+// Stat cards navigate to their section
+document.querySelectorAll('.stat-card[data-nav]').forEach(card => {
+  card.addEventListener('click', () => {
+    const target = card.dataset.nav;
+    navItems.forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-section="${target}"]`).classList.add('active');
+    sections.forEach(s => s.classList.remove('active'));
+    document.getElementById('section-' + target).classList.add('active');
+    currentSection = target;
+  });
+});
+
+// Quick d20
+btnQuickD20.addEventListener('click', () => {
+  const roll = Math.floor(Math.random() * 20) + 1;
+  quickD20Result.textContent = roll;
+  btnQuickD20.classList.remove('rolling');
+  void btnQuickD20.offsetWidth;
+  btnQuickD20.classList.add('rolling');
+});
+
+// ── Import / Export ───────────────────────────────────────────
+
+function exportAllData() {
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: {},
+  };
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('system:') || key.startsWith('session:') ||
+        key.startsWith('character:') || key === CAMPAIGN_NAME_KEY) {
+      payload.data[key] = localStorage.getItem(key);
+    }
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `ttrpg-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(json) {
+  let parsed;
+  try { parsed = JSON.parse(json); } catch { alert('Invalid JSON file.'); return; }
+  if (!parsed.data || typeof parsed.data !== 'object') {
+    alert('Unrecognised backup format.'); return;
+  }
+
+  const keys    = Object.keys(parsed.data);
+  const clashes = keys.filter(k => localStorage.getItem(k));
+
+  let overwrite = false;
+  if (clashes.length > 0) {
+    overwrite = !confirm(
+      `${clashes.length} item(s) already exist.\n\nOK = Merge (keep existing, add new)\nCancel = Overwrite all`
+    );
+  }
+
+  let count = 0;
+  keys.forEach(key => {
+    if (!overwrite && localStorage.getItem(key)) return;
+    localStorage.setItem(key, parsed.data[key]);
+    count++;
+  });
+
+  renderSystemsList();
+  renderSessionsList();
+  renderHomeDashboard();
+  alert(`Imported ${count} item(s).`);
+}
+
+btnExportAll.addEventListener('click', exportAllData);
+btnImportData.addEventListener('click', () => importFileInput.click());
+importFileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => importBackup(ev.target.result);
+  reader.readAsText(file);
+  importFileInput.value = '';
+});
+
+// Per-system .md export
+const btnExportSystem = document.getElementById('btn-export-system');
+btnExportSystem.addEventListener('click', () => {
+  if (!currentSystemKey) return;
+  const data = loadSystem(currentSystemKey);
+  if (!data) return;
+  const blob = new Blob([data.content], { type: 'text/markdown' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = currentSystemKey.slice(STORAGE_PREFIX.length) + '.md';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ── Pre-built system loader ───────────────────────────────────
+
+const PREBUILT_FILES = [
+  'dnd5e-2024.md', 'pathfinder2e.md', 'starfinder.md',
+  'call-of-cthulhu-7e.md', 'vampire-the-masquerade-5e.md',
+  'shadowrun-6e.md', 'cyberpunk-red.md',
+  'blades-in-the-dark.md', 'fate-core.md',
+];
+
+function extractSystemName(content) {
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === '# System name') {
+      for (let j = i + 1; j < lines.length; j++) {
+        const t = lines[j].trim();
+        if (t && !t.startsWith('#') && !t.startsWith('<!--')) return t;
+      }
+    }
+  }
+  const h1 = lines.find(l => /^# [^#]/.test(l));
+  return h1 ? h1.slice(2).trim() : 'Unknown System';
+}
+
+async function loadPrebuiltSystems() {
+  if (allSystemKeys().length > 0) return; // already populated
+
+  let loaded = 0;
+  let fetchFailed = false;
+  for (const file of PREBUILT_FILES) {
+    try {
+      const res = await fetch(`systems/${file}`);
+      if (!res.ok) continue;
+      const content = await res.text();
+      const name    = extractSystemName(content);
+      const key     = systemNameToKey(name);
+      if (!localStorage.getItem(key)) {
+        saveSystem(key, { name, content, updatedAt: new Date().toISOString() });
+        loaded++;
+      }
+    } catch {
+      fetchFailed = true;
+      break; // file:// CORS — no point continuing
+    }
+  }
+
+  if (fetchFailed && loaded === 0) {
+    prebuiltNotice.style.display = '';
+  }
+
+  if (loaded > 0) {
+    renderSystemsList();
+    renderHomeDashboard();
+  }
+}
+
+// ── Mobile sidebar ────────────────────────────────────────────
+
+const appEl        = document.getElementById('app');
+const hamburger    = document.getElementById('hamburger');
+const mobileOverlay = document.getElementById('mobile-overlay');
+
+hamburger.addEventListener('click', () => appEl.classList.add('sidebar-open'));
+mobileOverlay.addEventListener('click', () => appEl.classList.remove('sidebar-open'));
+
+// Close sidebar on nav click (mobile)
+navItems.forEach(btn => {
+  btn.addEventListener('click', () => appEl.classList.remove('sidebar-open'));
+});
+
 // ── Init ─────────────────────────────────────────────────────
 renderSystemsList();
 renderSessionsList();
+renderHomeDashboard();
+loadPrebuiltSystems();
