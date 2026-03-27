@@ -138,14 +138,61 @@
         </div>
       </section>
 
-      <!-- Dice Roller Section (placeholder) -->
+      <!-- Dice Roller Section -->
       <section id="section-dice" class="section">
         <div class="section-header">
           <h1>Dice Roller</h1>
+          <button id="btn-clear-dice-history" class="btn-ghost-sm">Clear history</button>
         </div>
-        <div class="empty-state">
-          <span class="empty-icon">&#127922;</span>
-          <p>Dice roller coming soon.</p>
+        <p class="section-subtitle">Quick rolls and custom expressions.</p>
+
+        <div class="dice-layout">
+
+          <!-- Left: controls -->
+          <div class="dice-roller-panel">
+
+            <div class="dice-group">
+              <p class="dice-group-label">Quick roll</p>
+              <div class="dice-quick-grid">
+                <button class="dice-btn" data-sides="4">d4</button>
+                <button class="dice-btn" data-sides="6">d6</button>
+                <button class="dice-btn" data-sides="8">d8</button>
+                <button class="dice-btn" data-sides="10">d10</button>
+                <button class="dice-btn" data-sides="12">d12</button>
+                <button class="dice-btn" data-sides="20">d20</button>
+                <button class="dice-btn" data-sides="100">d%</button>
+              </div>
+            </div>
+
+            <div class="dice-group">
+              <p class="dice-group-label">Expression</p>
+              <div class="dice-expr-row">
+                <input id="dice-expr-input" type="text" class="dice-expr-input"
+                  placeholder="2d6+3, d20, 4d8-1…" spellcheck="false" autocomplete="off" />
+                <button id="btn-roll-expr" class="btn-primary">Roll</button>
+              </div>
+              <p class="dice-expr-hint">Format: XdY+Z &nbsp;·&nbsp;
+                e.g. <code>d20</code> &nbsp;<code>2d6+3</code> &nbsp;<code>4d6</code></p>
+            </div>
+
+            <div id="dice-result-card" class="dice-result-card" style="display:none;">
+              <div id="dice-result-total" class="dice-result-total"></div>
+              <div class="dice-result-detail">
+                <div id="dice-result-expr-label" class="dice-result-expr-label"></div>
+                <div id="dice-result-breakdown" class="dice-result-breakdown"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right: history -->
+          <div class="dice-history-panel">
+            <p class="dice-group-label">History</p>
+            <div id="dice-history-list" class="dice-history-list">
+              <p class="dice-history-empty">No rolls yet.</p>
+            </div>
+          </div>
+
         </div>
       </section>
     </main>

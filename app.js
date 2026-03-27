@@ -760,6 +760,116 @@ combatantInitInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') btnAddCombatant.click();
 });
 
+// ── Dice Roller ───────────────────────────────────────────────
+
+const diceHistory = []; // in-memory, max 50 entries
+const HISTORY_MAX = 50;
+
+// DOM refs
+const diceExprInput      = document.getElementById('dice-expr-input');
+const btnRollExpr        = document.getElementById('btn-roll-expr');
+const btnClearDiceHistory = document.getElementById('btn-clear-dice-history');
+const diceResultCard     = document.getElementById('dice-result-card');
+const diceResultTotal    = document.getElementById('dice-result-total');
+const diceResultExprLabel = document.getElementById('dice-result-expr-label');
+const diceResultBreakdown = document.getElementById('dice-result-breakdown');
+const diceHistoryList    = document.getElementById('dice-history-list');
+
+// Parse expressions like: d20, 2d6, 3d8+2, 1d20-1, d%
+function parseDiceExpr(raw) {
+  const s = raw.trim().replace(/\s+/g, '').toLowerCase().replace('d%', 'd100');
+  const m = s.match(/^(\d*)d(\d+)([+-]\d+)?$/);
+  if (!m) return null;
+  const count = parseInt(m[1] || '1', 10);
+  const sides = parseInt(m[2], 10);
+  const mod   = m[3] ? parseInt(m[3], 10) : 0;
+  if (count < 1 || count > 100 || sides < 2 || sides > 10000) return null;
+  const label = `${count}d${sides === 100 ? '%' : sides}${mod > 0 ? '+' + mod : mod < 0 ? mod : ''}`;
+  return { count, sides, mod, label };
+}
+
+function rollOneDie(sides) {
+  return Math.floor(Math.random() * sides) + 1;
+}
+
+function performRoll(raw) {
+  const parsed = parseDiceExpr(raw);
+  if (!parsed) {
+    diceExprInput.style.borderColor = 'var(--danger)';
+    setTimeout(() => (diceExprInput.style.borderColor = ''), 800);
+    return;
+  }
+  const { count, sides, mod, label } = parsed;
+  const rolls = Array.from({ length: count }, () => rollOneDie(sides));
+  const total = rolls.reduce((a, b) => a + b, 0) + mod;
+
+  const entry = { label, rolls, mod, total };
+  diceHistory.unshift(entry);
+  if (diceHistory.length > HISTORY_MAX) diceHistory.pop();
+
+  showDiceResult(entry);
+  renderDiceHistory();
+}
+
+function showDiceResult({ label, rolls, mod, total }) {
+  diceResultTotal.textContent = total;
+  diceResultExprLabel.textContent = label;
+
+  const pips = rolls.map(r => `<span class="dice-pip">${r}</span>`).join('');
+  const modStr = mod > 0 ? `<span class="dice-result-mod"> +${mod}</span>`
+               : mod < 0 ? `<span class="dice-result-mod"> ${mod}</span>` : '';
+  diceResultBreakdown.innerHTML = pips + modStr;
+
+  diceResultCard.style.display = '';
+  diceResultCard.classList.remove('rolling');
+  void diceResultCard.offsetWidth; // force reflow for re-animation
+  diceResultCard.classList.add('rolling');
+}
+
+function renderDiceHistory() {
+  if (diceHistory.length === 0) {
+    diceHistoryList.innerHTML = '<p class="dice-history-empty">No rolls yet.</p>';
+    return;
+  }
+  diceHistoryList.innerHTML = '';
+  diceHistory.forEach(({ label, rolls, mod, total }, i) => {
+    const rollsStr = rolls.join(', ') + (mod > 0 ? ` +${mod}` : mod < 0 ? ` ${mod}` : '');
+    const el = document.createElement('div');
+    el.className = 'dice-history-entry' + (i === 0 ? ' new' : '');
+    el.innerHTML = `
+      <div class="dice-history-meta">
+        <span class="dice-history-formula">${escapeHtml(label)}</span>
+        <span class="dice-history-rolls">[${escapeHtml(rollsStr)}]</span>
+      </div>
+      <span class="dice-history-total">${total}</span>
+    `;
+    diceHistoryList.appendChild(el);
+  });
+}
+
+// Quick dice buttons
+document.querySelectorAll('.dice-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const expr = `d${btn.dataset.sides}`;
+    diceExprInput.value = expr.replace('d100', 'd%');
+    performRoll(expr);
+  });
+});
+
+btnRollExpr.addEventListener('click', () => {
+  if (diceExprInput.value.trim()) performRoll(diceExprInput.value);
+});
+
+diceExprInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && diceExprInput.value.trim()) performRoll(diceExprInput.value);
+});
+
+btnClearDiceHistory.addEventListener('click', () => {
+  diceHistory.length = 0;
+  renderDiceHistory();
+  diceResultCard.style.display = 'none';
+});
+
 // ── Init ─────────────────────────────────────────────────────
 renderSystemsList();
 renderSessionsList();
