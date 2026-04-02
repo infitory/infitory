@@ -60,9 +60,15 @@ const STARTER_TEMPLATE = `## System name
 `;
 
 // ── State ────────────────────────────────────────────────────
-let currentSection = 'home';
+let currentSection   = 'home';
 let currentSystemKey = null; // storage key of the system being edited
-let unsavedChanges = false;
+let unsavedChanges   = false;
+
+// Characters state — declared early so nav handler can reference them before the module loads
+let currentPcId  = null;
+let currentNpcId = null;
+let pcUnsaved    = false;
+let npcUnsaved   = false;
 
 // ── DOM refs ─────────────────────────────────────────────────
 const navItems          = document.querySelectorAll('.nav-item');
@@ -1098,9 +1104,7 @@ renderSystemsList();
 renderSessionsList();
 renderHomeDashboard();
 loadPrebuiltSystems();
-renderPcList();
-renderNpcList();
-updateCharNavBadge();
+// renderPcList / renderNpcList / updateCharNavBadge called at end of Characters module
 
 // ── Characters ────────────────────────────────────────────────
 
@@ -1108,10 +1112,7 @@ const PC_PREFIX  = 'pc:';
 const NPC_PREFIX = 'npc:';
 
 // ── State ─────────────────────────────────────────────────────
-let currentPcId    = null;
-let currentNpcId   = null;
-let pcUnsaved      = false;
-let npcUnsaved     = false;
+// currentPcId, currentNpcId, pcUnsaved, npcUnsaved declared early at top of file
 let currentCharTab = 'pc';
 
 // ── DOM refs ──────────────────────────────────────────────────
@@ -1742,3 +1743,8 @@ npcSearch.addEventListener('input', () =>
 npcStatusFilter.addEventListener('change', () =>
   renderNpcList(npcSearch.value, npcStatusFilter.value)
 );
+
+// ── Characters init (must run after all DOM refs above are live) ──
+renderPcList();
+renderNpcList();
+updateCharNavBadge();
