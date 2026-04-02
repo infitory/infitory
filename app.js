@@ -99,6 +99,15 @@ navItems.forEach(btn => {
       if (!confirm('You have unsaved session changes. Discard?')) return;
       closeSessionEditor();
     }
+    // Warn on unsaved character edits
+    if (currentPcId && pcUnsaved) {
+      if (!confirm('You have unsaved PC changes. Discard?')) return;
+      closePcEditor();
+    }
+    if (currentNpcId && npcUnsaved) {
+      if (!confirm('You have unsaved NPC changes. Discard?')) return;
+      closeNpcEditor();
+    }
 
     navItems.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
@@ -262,6 +271,8 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (currentSystemKey) saveCurrentSystem();
     else if (currentSessionId) saveCurrentSession();
+    else if (currentPcId) saveCurrentPc();
+    else if (currentNpcId) saveCurrentNpc();
   }
 });
 
@@ -900,7 +911,7 @@ function renderHomeDashboard() {
   campaignNameInput.value = localStorage.getItem(CAMPAIGN_NAME_KEY) || '';
   statSystemsEl.textContent    = allSystemKeys().length;
   statSessionsEl.textContent   = allSessionKeys().length;
-  statCharactersEl.textContent = 0;
+  statCharactersEl.textContent = allPcKeys().length + allNpcKeys().length;
 
   // Recent sessions — last 3 by date
   const recent = allSessionKeys()
@@ -973,7 +984,7 @@ function exportAllData() {
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key.startsWith('system:') || key.startsWith('session:') ||
-        key.startsWith('character:') || key === CAMPAIGN_NAME_KEY) {
+        key.startsWith('pc:') || key.startsWith('npc:') || key === CAMPAIGN_NAME_KEY) {
       payload.data[key] = localStorage.getItem(key);
     }
   }
@@ -1013,6 +1024,11 @@ function importBackup(json) {
   renderSystemsList();
   renderSessionsList();
   renderHomeDashboard();
+  if (typeof renderPcList === 'function') {
+    renderPcList();
+    renderNpcList();
+    updateCharNavBadge();
+  }
   alert(`Imported ${count} item(s).`);
 }
 
@@ -1082,3 +1098,647 @@ renderSystemsList();
 renderSessionsList();
 renderHomeDashboard();
 loadPrebuiltSystems();
+renderPcList();
+renderNpcList();
+updateCharNavBadge();
+
+// ── Characters ────────────────────────────────────────────────
+
+const PC_PREFIX  = 'pc:';
+const NPC_PREFIX = 'npc:';
+
+// ── State ─────────────────────────────────────────────────────
+let currentPcId    = null;
+let currentNpcId   = null;
+let pcUnsaved      = false;
+let npcUnsaved     = false;
+let currentCharTab = 'pc';
+
+// ── DOM refs ──────────────────────────────────────────────────
+const charPcPanel       = document.getElementById('char-pc-panel');
+const charNpcPanel      = document.getElementById('char-npc-panel');
+const pcListView        = document.getElementById('pc-list-view');
+const pcEditorView      = document.getElementById('pc-editor-view');
+const pcList            = document.getElementById('pc-list');
+const pcEmpty           = document.getElementById('pc-empty');
+const pcSearch          = document.getElementById('pc-search');
+const btnNewPc          = document.getElementById('btn-new-pc');
+const btnBackPc         = document.getElementById('btn-back-pc');
+const btnSavePc         = document.getElementById('btn-save-pc');
+const btnDeletePc       = document.getElementById('btn-delete-pc');
+const pcEditorTitle     = document.getElementById('pc-editor-title');
+const pcSystemSelect    = document.getElementById('pc-system-select');
+const pcFormContainer   = document.getElementById('pc-form-container');
+const pcEditorStatus    = document.getElementById('pc-editor-status');
+
+const npcListView       = document.getElementById('npc-list-view');
+const npcEditorView     = document.getElementById('npc-editor-view');
+const npcList           = document.getElementById('npc-list');
+const npcEmpty          = document.getElementById('npc-empty');
+const npcSearch         = document.getElementById('npc-search');
+const npcStatusFilter   = document.getElementById('npc-status-filter');
+const btnNewNpc         = document.getElementById('btn-new-npc');
+const btnBackNpc        = document.getElementById('btn-back-npc');
+const btnSaveNpc        = document.getElementById('btn-save-npc');
+const btnDeleteNpc      = document.getElementById('btn-delete-npc');
+const npcEditorTitle    = document.getElementById('npc-editor-title');
+const npcSystemSelect   = document.getElementById('npc-system-select');
+const npcFormContainer  = document.getElementById('npc-form-container');
+const npcEditorStatus   = document.getElementById('npc-editor-status');
+const npcNameInput      = document.getElementById('npc-name');
+const npcRoleInput      = document.getElementById('npc-role');
+const npcCrInput        = document.getElementById('npc-cr');
+const npcStatusInput    = document.getElementById('npc-status');
+const npcDescInput      = document.getElementById('npc-description');
+const npcStatsInput     = document.getElementById('npc-stats');
+const npcAbilitiesInput = document.getElementById('npc-abilities');
+const npcLootInput      = document.getElementById('npc-loot');
+const npcNotesInput     = document.getElementById('npc-notes');
+const charNavBadge      = document.getElementById('char-nav-badge');
+
+// ── Storage helpers ───────────────────────────────────────────
+
+function allPcKeys()  { return Object.keys(localStorage).filter(k => k.startsWith(PC_PREFIX)); }
+function allNpcKeys() { return Object.keys(localStorage).filter(k => k.startsWith(NPC_PREFIX)); }
+
+function loadPcData(id)   { try { return JSON.parse(localStorage.getItem(PC_PREFIX  + id)); } catch { return null; } }
+function loadNpcData(id)  { try { return JSON.parse(localStorage.getItem(NPC_PREFIX + id)); } catch { return null; } }
+function savePcData(d)    { localStorage.setItem(PC_PREFIX  + d.id, JSON.stringify(d)); }
+function saveNpcData(d)   { localStorage.setItem(NPC_PREFIX + d.id, JSON.stringify(d)); }
+function deletePcData(id) { localStorage.removeItem(PC_PREFIX  + id); }
+function deleteNpcData(id){ localStorage.removeItem(NPC_PREFIX + id); }
+
+function updateCharNavBadge() {
+  const n = allPcKeys().length + allNpcKeys().length;
+  charNavBadge.textContent = n;
+  charNavBadge.style.display = n > 0 ? 'inline-flex' : 'none';
+}
+
+// ── System Markdown parser ────────────────────────────────────
+
+const FIELD_TYPES = new Set(['text', 'number', 'textarea', 'select', 'checkbox']);
+
+function parseSystemSections(content) {
+  const out = {};
+  let cur = null;
+  for (const line of content.split('\n')) {
+    const m = line.match(/^## (.+)/);
+    if (m) { cur = m[1].trim(); out[cur] = []; continue; }
+    if (cur && line.trim() && !line.startsWith('#') && !line.startsWith('<!--')) {
+      out[cur].push(line.trim());
+    }
+  }
+  return out;
+}
+
+function parseFieldLine(line) {
+  const parts = line.split('|').map(p => p.trim());
+  if (parts.length < 2 || !parts[0]) return null;
+  const name = parts[0];
+  const ti = parts.findIndex((p, i) => i > 0 && FIELD_TYPES.has(p.toLowerCase()));
+  if (ti === -1) return null;
+  const type = parts[ti].toLowerCase();
+  const f = { name, type };
+  if (type === 'select') {
+    f.options = parts.slice(ti + 1).join(',').split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if (type === 'number') {
+    parts.forEach(p => {
+      const mn = p.match(/^min:(-?\d+)/); if (mn) f.min = +mn[1];
+      const mx = p.match(/^max:(-?\d+)/); if (mx) f.max = +mx[1];
+    });
+  }
+  return f;
+}
+
+function parseSkillLine(line) {
+  const parts = line.split('|').map(p => p.trim());
+  if (!parts[0]) return null;
+  // skip list bullets, numeric table rows, and very long prose lines
+  if (/^[-*+]/.test(parts[0])) return null;
+  if (/^\d/.test(parts[0]) || /^[+\-]\d/.test(parts[0])) return null;
+  if (parts[0].length > 50) return null;
+  return { name: parts[0], attr: parts[1] || '' };
+}
+
+// ── PC form builder ───────────────────────────────────────────
+
+function renderPcField(f, saved) {
+  const id  = 'pcf_' + f.name.replace(/[^a-zA-Z0-9]/g, '_');
+  const da  = `data-field="${escapeHtml(f.name)}"`;
+  const val = saved !== undefined && saved !== null ? saved : '';
+  const ev  = escapeHtml(String(val));
+
+  if (f.type === 'checkbox') {
+    const chk = (val === 'true' || val === true) ? 'checked' : '';
+    return `<div class="char-checkbox-row">
+      <input type="checkbox" id="${id}" ${da} ${chk}>
+      <label class="char-checkbox-label" for="${id}">${escapeHtml(f.name)}</label>
+    </div>`;
+  }
+  if (f.type === 'textarea') {
+    return `<div class="char-field char-field-full">
+      <label class="char-field-label" for="${id}">${escapeHtml(f.name)}</label>
+      <textarea id="${id}" class="char-textarea" rows="3" ${da}>${ev}</textarea>
+    </div>`;
+  }
+  if (f.type === 'select' && f.options && f.options.length) {
+    const opts = f.options.map(o =>
+      `<option value="${escapeHtml(o)}"${val === o ? ' selected' : ''}>${escapeHtml(o)}</option>`
+    ).join('');
+    return `<div class="char-field">
+      <label class="char-field-label" for="${id}">${escapeHtml(f.name)}</label>
+      <select id="${id}" class="char-input" ${da}><option value="">—</option>${opts}</select>
+    </div>`;
+  }
+  if (f.type === 'number') {
+    const minA = f.min !== undefined ? ` min="${f.min}"` : '';
+    const maxA = f.max !== undefined ? ` max="${f.max}"` : '';
+    return `<div class="char-field">
+      <label class="char-field-label" for="${id}">${escapeHtml(f.name)}</label>
+      <input type="number" id="${id}" class="char-input"${minA}${maxA} value="${ev}" ${da}>
+    </div>`;
+  }
+  // default: text
+  return `<div class="char-field">
+    <label class="char-field-label" for="${id}">${escapeHtml(f.name)}</label>
+    <input type="text" id="${id}" class="char-input" value="${ev}" ${da}>
+  </div>`;
+}
+
+function buildPcForm(systemContent, savedFields) {
+  const secs = parseSystemSections(systemContent);
+  const sf   = savedFields || {};
+  const html = [];
+
+  // Character fields section
+  const charFields = (secs['Character fields'] || []).map(parseFieldLine).filter(Boolean);
+  if (charFields.length) {
+    html.push('<div class="char-form-section"><div class="char-form-section-title">Character Info</div><div class="char-form-group">');
+    charFields.forEach(f => html.push(renderPcField(f, sf[f.name])));
+    html.push('</div></div>');
+  }
+
+  // Attributes (deduplicate against charFields names)
+  const known = new Set(charFields.map(f => f.name.toLowerCase()));
+  const attrFields = (secs['Attributes'] || []).map(parseFieldLine).filter(f => f && !known.has(f.name.toLowerCase()));
+  if (attrFields.length) {
+    html.push('<div class="char-form-section"><div class="char-form-section-title">Attributes</div><div class="char-form-group">');
+    attrFields.forEach(f => html.push(renderPcField(f, sf[f.name])));
+    html.push('</div></div>');
+  }
+
+  // Skills
+  const skillFields = (secs['Skills'] || []).map(parseSkillLine).filter(Boolean);
+  if (skillFields.length) {
+    html.push('<div class="char-form-section"><div class="char-form-section-title">Skills</div><div class="skills-grid">');
+    skillFields.forEach(sk => {
+      const v = escapeHtml(sf['skill:' + sk.name] || '');
+      html.push(`<div class="skill-row">
+        <input type="text" class="skill-val-input" data-field="skill:${escapeHtml(sk.name)}" value="${v}" placeholder="—">
+        <div class="skill-label-wrap">
+          <span class="skill-name">${escapeHtml(sk.name)}</span>
+          ${sk.attr ? `<span class="skill-attr">${escapeHtml(sk.attr)}</span>` : ''}
+        </div>
+      </div>`);
+    });
+    html.push('</div></div>');
+  }
+
+  if (!html.length) {
+    return '<div class="char-no-system"><strong>No parseable fields</strong><span>This system has no structured character sheet fields.</span></div>';
+  }
+  return html.join('');
+}
+
+function readPcFormValues() {
+  const fields = {};
+  pcFormContainer.querySelectorAll('[data-field]').forEach(el => {
+    fields[el.dataset.field] = el.type === 'checkbox' ? (el.checked ? 'true' : 'false') : el.value;
+  });
+  return fields;
+}
+
+function getPcDisplayName(data) {
+  if (data.fields) {
+    return data.fields['Name'] || data.fields['name'] || data.name || 'Unnamed Character';
+  }
+  return data.name || 'Unnamed Character';
+}
+
+// ── PC list ───────────────────────────────────────────────────
+
+function renderPcList(filter) {
+  let items = allPcKeys()
+    .map(k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } })
+    .filter(Boolean)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  if (filter) {
+    const q = filter.toLowerCase();
+    items = items.filter(d =>
+      (d.name || '').toLowerCase().includes(q) ||
+      (d.systemName || '').toLowerCase().includes(q)
+    );
+  }
+
+  pcList.innerHTML = '';
+  if (items.length === 0) {
+    pcEmpty.style.display = '';
+    pcList.style.display = 'none';
+    return;
+  }
+  pcEmpty.style.display = 'none';
+  pcList.style.display = '';
+
+  items.forEach(data => {
+    const card = document.createElement('div');
+    card.className = 'char-card';
+    card.innerHTML = `
+      <div class="char-card-info">
+        <span class="char-card-name">${escapeHtml(data.name || 'Unnamed')}</span>
+        ${data.systemName ? `<span class="char-card-meta">${escapeHtml(data.systemName)}</span>` : ''}
+      </div>
+      ${data.systemName ? `<span class="char-card-sys">${escapeHtml(data.systemName)}</span>` : ''}
+      <span class="char-card-arrow">&#8250;</span>`;
+    card.addEventListener('click', () => openPcEditor(data.id));
+    pcList.appendChild(card);
+  });
+}
+
+// ── NPC list ──────────────────────────────────────────────────
+
+function renderNpcList(nameFilter, statusFilter) {
+  let items = allNpcKeys()
+    .map(k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } })
+    .filter(Boolean)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  if (nameFilter) {
+    const q = nameFilter.toLowerCase();
+    items = items.filter(d =>
+      (d.name || '').toLowerCase().includes(q) ||
+      (d.role || '').toLowerCase().includes(q)
+    );
+  }
+  if (statusFilter) items = items.filter(d => d.status === statusFilter);
+
+  npcList.innerHTML = '';
+  if (items.length === 0) {
+    npcEmpty.style.display = '';
+    npcList.style.display = 'none';
+    return;
+  }
+  npcEmpty.style.display = 'none';
+  npcList.style.display = '';
+
+  items.forEach(data => {
+    const card = document.createElement('div');
+    card.className = 'char-card';
+    const st = data.status || 'Unknown';
+    card.innerHTML = `
+      <div class="char-card-info">
+        <span class="char-card-name">${escapeHtml(data.name || 'Unnamed')}</span>
+        ${data.role ? `<span class="char-card-meta">${escapeHtml(data.role)}</span>` : ''}
+      </div>
+      <span class="status-badge status-${escapeHtml(st)}">${escapeHtml(st)}</span>
+      <span class="char-card-arrow">&#8250;</span>`;
+    card.addEventListener('click', () => openNpcEditor(data.id));
+    npcList.appendChild(card);
+  });
+}
+
+// ── PC editor ────────────────────────────────────────────────
+
+function populatePcSystemSelect(lockedKey) {
+  pcSystemSelect.innerHTML = '<option value="">— Select a system —</option>';
+  allSystemKeys().forEach(k => {
+    const d = loadSystem(k);
+    if (!d) return;
+    const opt = document.createElement('option');
+    opt.value = k;
+    opt.textContent = d.name;
+    pcSystemSelect.appendChild(opt);
+  });
+  if (lockedKey) {
+    pcSystemSelect.value = lockedKey;
+    pcSystemSelect.disabled = true;
+  } else {
+    pcSystemSelect.disabled = false;
+  }
+}
+
+function refreshPcForm(sysKey, savedFields) {
+  if (!sysKey) {
+    pcFormContainer.innerHTML = '<div class="char-no-system"><strong>No system selected</strong><span>Choose a system above to generate the character sheet.</span></div>';
+    return;
+  }
+  const sys = loadSystem(sysKey);
+  if (!sys) {
+    pcFormContainer.innerHTML = '<div class="char-no-system"><strong>System not found</strong><span>The system for this character is no longer loaded.</span></div>';
+    return;
+  }
+  pcFormContainer.innerHTML = buildPcForm(sys.content, savedFields || {});
+}
+
+function openPcEditor(id) {
+  const data = loadPcData(id);
+  if (!data) return;
+
+  currentPcId = id;
+  pcEditorTitle.textContent = getPcDisplayName(data);
+  populatePcSystemSelect(data.systemKey || null);
+  refreshPcForm(data.systemKey || null, data.fields);
+  setPcUnsaved(false);
+
+  pcListView.style.display = 'none';
+  pcEditorView.style.display = 'flex';
+}
+
+function closePcEditor() {
+  currentPcId = null;
+  pcUnsaved   = false;
+  pcEditorView.style.display = 'none';
+  pcListView.style.display   = '';
+  renderPcList(pcSearch.value);
+  updateCharNavBadge();
+}
+
+function setPcUnsaved(state) {
+  pcUnsaved = state;
+  if (state) {
+    pcEditorStatus.textContent = 'Unsaved changes';
+    pcEditorStatus.className   = 'editor-status status-unsaved';
+  } else {
+    pcEditorStatus.textContent = '';
+    pcEditorStatus.className   = 'editor-status';
+  }
+}
+
+function saveCurrentPc() {
+  if (!currentPcId) return;
+  const existing   = loadPcData(currentPcId) || {};
+  const fields     = readPcFormValues();
+  const name       = fields['Name'] || fields['name'] || existing.name || 'Unnamed Character';
+  const sysKey     = pcSystemSelect.value;
+  const sysOpt     = pcSystemSelect.options[pcSystemSelect.selectedIndex];
+  const systemName = sysOpt && sysOpt.value ? sysOpt.text : '';
+
+  savePcData({
+    ...existing,
+    id: currentPcId,
+    name,
+    systemKey: sysKey,
+    systemName,
+    fields,
+    updatedAt: new Date().toISOString(),
+  });
+
+  pcEditorTitle.textContent = name;
+  setPcUnsaved(false);
+  flashCharStatus(pcEditorStatus, 'Saved.', 'status-saved', () => pcUnsaved);
+  updateCharNavBadge();
+}
+
+// ── NPC editor ────────────────────────────────────────────────
+
+function populateNpcSystemSelect() {
+  npcSystemSelect.innerHTML = '<option value="">— None —</option>';
+  allSystemKeys().forEach(k => {
+    const d = loadSystem(k);
+    if (!d) return;
+    const opt = document.createElement('option');
+    opt.value = k;
+    opt.textContent = d.name;
+    npcSystemSelect.appendChild(opt);
+  });
+}
+
+function openNpcEditor(id) {
+  const data = loadNpcData(id);
+  if (!data) return;
+
+  currentNpcId = id;
+  npcEditorTitle.textContent = data.name || 'Unnamed NPC';
+  populateNpcSystemSelect();
+  npcSystemSelect.value  = data.systemKey  || '';
+  npcNameInput.value     = data.name        || '';
+  npcRoleInput.value     = data.role        || '';
+  npcCrInput.value       = data.cr          || '';
+  npcStatusInput.value   = data.status      || 'Alive';
+  npcDescInput.value     = data.description || '';
+  npcStatsInput.value    = data.stats       || '';
+  npcAbilitiesInput.value = data.abilities  || '';
+  npcLootInput.value     = data.loot        || '';
+  npcNotesInput.value    = data.notes       || '';
+
+  setNpcUnsaved(false);
+  npcListView.style.display  = 'none';
+  npcEditorView.style.display = 'flex';
+}
+
+function closeNpcEditor() {
+  currentNpcId = null;
+  npcUnsaved   = false;
+  npcEditorView.style.display = 'none';
+  npcListView.style.display   = '';
+  renderNpcList(npcSearch.value, npcStatusFilter.value);
+  updateCharNavBadge();
+}
+
+function setNpcUnsaved(state) {
+  npcUnsaved = state;
+  if (state) {
+    npcEditorStatus.textContent = 'Unsaved changes';
+    npcEditorStatus.className   = 'editor-status status-unsaved';
+  } else {
+    npcEditorStatus.textContent = '';
+    npcEditorStatus.className   = 'editor-status';
+  }
+}
+
+function saveCurrentNpc() {
+  if (!currentNpcId) return;
+  const name = npcNameInput.value.trim();
+  if (!name) {
+    npcNameInput.style.borderColor = 'var(--danger)';
+    setTimeout(() => npcNameInput.style.borderColor = '', 1000);
+    npcNameInput.focus();
+    return;
+  }
+
+  const existing   = loadNpcData(currentNpcId) || {};
+  const sysOpt     = npcSystemSelect.options[npcSystemSelect.selectedIndex];
+  const systemName = sysOpt && sysOpt.value ? sysOpt.text : '';
+
+  saveNpcData({
+    ...existing,
+    id: currentNpcId,
+    name,
+    role:        npcRoleInput.value.trim(),
+    systemKey:   npcSystemSelect.value,
+    systemName,
+    cr:          npcCrInput.value.trim(),
+    status:      npcStatusInput.value,
+    description: npcDescInput.value,
+    stats:       npcStatsInput.value,
+    abilities:   npcAbilitiesInput.value,
+    loot:        npcLootInput.value,
+    notes:       npcNotesInput.value,
+    updatedAt:   new Date().toISOString(),
+  });
+
+  npcEditorTitle.textContent = name;
+  setNpcUnsaved(false);
+  flashCharStatus(npcEditorStatus, 'Saved.', 'status-saved', () => npcUnsaved);
+  updateCharNavBadge();
+}
+
+function flashCharStatus(el, msg, cls, isUnsaved) {
+  el.textContent = msg;
+  el.className   = 'editor-status ' + cls;
+  setTimeout(() => {
+    if (!isUnsaved()) { el.textContent = ''; el.className = 'editor-status'; }
+  }, 2000);
+}
+
+// ── Character sub-tab switching ───────────────────────────────
+
+document.querySelectorAll('.char-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.charTab;
+    if (tab === currentCharTab) return;
+
+    if (currentCharTab === 'pc' && currentPcId && pcUnsaved) {
+      if (!confirm('You have unsaved PC changes. Discard?')) return;
+      closePcEditor();
+    }
+    if (currentCharTab === 'npc' && currentNpcId && npcUnsaved) {
+      if (!confirm('You have unsaved NPC changes. Discard?')) return;
+      closeNpcEditor();
+    }
+
+    currentCharTab = tab;
+    document.querySelectorAll('.char-tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.charTab === tab)
+    );
+    charPcPanel.classList.toggle('active', tab === 'pc');
+    charNpcPanel.classList.toggle('active', tab === 'npc');
+    // toggle display for panels not using active class in CSS when not active
+    charPcPanel.style.display  = tab === 'pc'  ? '' : 'none';
+    charNpcPanel.style.display = tab === 'npc' ? '' : 'none';
+
+    if (tab === 'pc')  renderPcList(pcSearch.value);
+    else               renderNpcList(npcSearch.value, npcStatusFilter.value);
+  });
+});
+
+// ── PC event listeners ────────────────────────────────────────
+
+btnNewPc.addEventListener('click', () => {
+  const id = newId();
+  savePcData({
+    id,
+    name: 'New Character',
+    systemKey: '',
+    systemName: '',
+    fields: {},
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  currentPcId = id;
+  pcEditorTitle.textContent = 'New Character';
+  populatePcSystemSelect(null);
+  refreshPcForm(null, null);
+  setPcUnsaved(false);
+  pcListView.style.display  = 'none';
+  pcEditorView.style.display = 'flex';
+});
+
+btnBackPc.addEventListener('click', () => {
+  if (pcUnsaved && !confirm('You have unsaved changes. Discard and go back?')) return;
+  closePcEditor();
+});
+
+btnSavePc.addEventListener('click', saveCurrentPc);
+
+btnDeletePc.addEventListener('click', () => {
+  if (!currentPcId) return;
+  if (!confirm(`Delete "${pcEditorTitle.textContent}"? This cannot be undone.`)) return;
+  deletePcData(currentPcId);
+  closePcEditor();
+});
+
+// Regenerate form when system changes
+pcSystemSelect.addEventListener('change', () => {
+  const sysKey = pcSystemSelect.value;
+
+  // Warn if the form already has values
+  const hasValues = Array.from(pcFormContainer.querySelectorAll('[data-field]'))
+    .some(el => el.type === 'checkbox' ? el.checked : el.value.trim() !== '');
+
+  if (hasValues && !confirm('Changing system will clear all field values. Continue?')) {
+    const prev = currentPcId ? (loadPcData(currentPcId) || {}).systemKey : '';
+    pcSystemSelect.value = prev || '';
+    return;
+  }
+
+  refreshPcForm(sysKey, null);
+  if (currentPcId) setPcUnsaved(true);
+});
+
+pcFormContainer.addEventListener('input',  () => { if (currentPcId) setPcUnsaved(true); });
+pcFormContainer.addEventListener('change', () => { if (currentPcId) setPcUnsaved(true); });
+
+pcSearch.addEventListener('input', () => renderPcList(pcSearch.value));
+
+// ── NPC event listeners ───────────────────────────────────────
+
+btnNewNpc.addEventListener('click', () => {
+  const id = newId();
+  saveNpcData({
+    id,
+    name: '',
+    role: '',
+    systemKey: '',
+    systemName: '',
+    cr: '',
+    status: 'Alive',
+    description: '',
+    stats: '',
+    abilities: '',
+    loot: '',
+    notes: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  openNpcEditor(id);
+});
+
+btnBackNpc.addEventListener('click', () => {
+  if (npcUnsaved && !confirm('You have unsaved changes. Discard and go back?')) return;
+  closeNpcEditor();
+});
+
+btnSaveNpc.addEventListener('click', saveCurrentNpc);
+
+btnDeleteNpc.addEventListener('click', () => {
+  if (!currentNpcId) return;
+  if (!confirm(`Delete "${npcNameInput.value.trim() || 'this NPC'}"? This cannot be undone.`)) return;
+  deleteNpcData(currentNpcId);
+  closeNpcEditor();
+});
+
+[npcNameInput, npcRoleInput, npcCrInput, npcDescInput, npcStatsInput,
+ npcAbilitiesInput, npcLootInput, npcNotesInput].forEach(el =>
+  el.addEventListener('input', () => setNpcUnsaved(true))
+);
+npcStatusInput.addEventListener('change',  () => setNpcUnsaved(true));
+npcSystemSelect.addEventListener('change', () => setNpcUnsaved(true));
+
+npcSearch.addEventListener('input', () =>
+  renderNpcList(npcSearch.value, npcStatusFilter.value)
+);
+npcStatusFilter.addEventListener('change', () =>
+  renderNpcList(npcSearch.value, npcStatusFilter.value)
+);

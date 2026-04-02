@@ -26,6 +26,7 @@
       </button>
       <button class="nav-item" data-section="characters">
         <span class="nav-icon">&#128100;</span> Characters
+        <span id="char-nav-badge" class="nav-badge" style="display:none;"></span>
       </button>
       <button class="nav-item" data-section="sessions">
         <span class="nav-icon">&#128203;</span> Sessions
@@ -121,13 +122,154 @@
 
     <!-- Characters Section -->
     <section id="section-characters" class="section">
-      <div class="section-header">
-        <h1>Characters</h1>
+
+      <!-- Sub-tab bar -->
+      <div class="char-tabs-bar">
+        <button class="char-tab-btn active" data-char-tab="pc">Player Characters</button>
+        <button class="char-tab-btn" data-char-tab="npc">NPCs</button>
       </div>
-      <div class="empty-state">
-        <span class="empty-icon">&#128100;</span>
-        <p>Characters coming soon.</p>
-      </div>
+
+      <!-- ── PC panel ─────────────────────────────────────── -->
+      <div id="char-pc-panel" class="char-tab-panel active">
+
+        <!-- PC list view -->
+        <div id="pc-list-view" class="char-list-view">
+          <div class="section-header">
+            <h1>Player Characters</h1>
+            <div class="char-header-controls">
+              <input id="pc-search" class="char-search" type="text" placeholder="Search PCs…" />
+              <button id="btn-new-pc" class="btn-primary">+ New PC</button>
+            </div>
+          </div>
+          <div id="pc-list" class="char-cards-list"></div>
+          <div id="pc-empty" class="empty-state" style="display:none;">
+            <span class="empty-icon">&#128100;</span>
+            <p>No player characters yet. Create your first one!</p>
+          </div>
+        </div>
+
+        <!-- PC editor view -->
+        <div id="pc-editor-view" class="char-editor-view" style="display:none;">
+          <div class="char-editor-header">
+            <button id="btn-back-pc" class="btn-back">&#8592; Back</button>
+            <span id="pc-editor-title" class="char-editor-title">New Character</span>
+            <div class="editor-actions">
+              <button id="btn-delete-pc" class="btn-danger">Delete</button>
+              <button id="btn-save-pc" class="btn-primary">Save</button>
+            </div>
+          </div>
+          <div class="char-system-bar">
+            <label class="char-field-label" for="pc-system-select">System</label>
+            <select id="pc-system-select" class="char-system-select"></select>
+          </div>
+          <div id="pc-form-container" class="char-form-scroll"></div>
+          <div id="pc-editor-status" class="editor-status"></div>
+        </div>
+
+      </div><!-- /char-pc-panel -->
+
+      <!-- ── NPC panel ────────────────────────────────────── -->
+      <div id="char-npc-panel" class="char-tab-panel" style="display:none;">
+
+        <!-- NPC list view -->
+        <div id="npc-list-view" class="char-list-view">
+          <div class="section-header">
+            <h1>Non-Player Characters</h1>
+            <div class="char-header-controls">
+              <input id="npc-search" class="char-search" type="text" placeholder="Search NPCs…" />
+              <select id="npc-status-filter" class="char-status-filter">
+                <option value="">All statuses</option>
+                <option>Alive</option>
+                <option>Dead</option>
+                <option>Unknown</option>
+                <option>Allied</option>
+                <option>Hostile</option>
+                <option>Neutral</option>
+              </select>
+              <button id="btn-new-npc" class="btn-primary">+ New NPC</button>
+            </div>
+          </div>
+          <div id="npc-list" class="char-cards-list"></div>
+          <div id="npc-empty" class="empty-state" style="display:none;">
+            <span class="empty-icon">&#128123;</span>
+            <p>No NPCs yet. Add your first ally or villain!</p>
+          </div>
+        </div>
+
+        <!-- NPC editor view -->
+        <div id="npc-editor-view" class="char-editor-view" style="display:none;">
+          <div class="char-editor-header">
+            <button id="btn-back-npc" class="btn-back">&#8592; Back</button>
+            <span id="npc-editor-title" class="char-editor-title">New NPC</span>
+            <div class="editor-actions">
+              <button id="btn-delete-npc" class="btn-danger">Delete</button>
+              <button id="btn-save-npc" class="btn-primary">Save</button>
+            </div>
+          </div>
+          <div id="npc-form-container" class="char-form-scroll">
+            <div class="char-form-section">
+              <div class="char-form-section-title">Identity</div>
+              <div class="char-form-group">
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-name">Name <span class="char-required">*</span></label>
+                  <input id="npc-name" type="text" class="char-input" placeholder="Character name…" />
+                </div>
+                <div class="char-field">
+                  <label class="char-field-label" for="npc-role">Role / Type</label>
+                  <input id="npc-role" type="text" class="char-input" placeholder="Merchant, Guard Captain…" />
+                </div>
+                <div class="char-field">
+                  <label class="char-field-label" for="npc-system-select">System</label>
+                  <select id="npc-system-select" class="char-input"></select>
+                </div>
+                <div class="char-field">
+                  <label class="char-field-label" for="npc-cr">CR / Threat Level</label>
+                  <input id="npc-cr" type="text" class="char-input" placeholder="CR 5, Threat 3…" />
+                </div>
+                <div class="char-field">
+                  <label class="char-field-label" for="npc-status">Status</label>
+                  <select id="npc-status" class="char-input">
+                    <option value="Alive">Alive</option>
+                    <option value="Dead">Dead</option>
+                    <option value="Unknown">Unknown</option>
+                    <option value="Allied">Allied</option>
+                    <option value="Hostile">Hostile</option>
+                    <option value="Neutral">Neutral</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="char-form-section">
+              <div class="char-form-section-title">Details</div>
+              <div class="char-form-group">
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-description">Description</label>
+                  <textarea id="npc-description" class="char-textarea" rows="3" placeholder="Appearance, personality, mannerisms…"></textarea>
+                </div>
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-stats">Stats Summary</label>
+                  <textarea id="npc-stats" class="char-textarea" rows="2" placeholder="HP: 45, AC: 16, ATK: +7…"></textarea>
+                </div>
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-abilities">Abilities &amp; Traits</label>
+                  <textarea id="npc-abilities" class="char-textarea" rows="3" placeholder="Special abilities, traits, spells…"></textarea>
+                </div>
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-loot">Loot / Rewards</label>
+                  <textarea id="npc-loot" class="char-textarea" rows="2" placeholder="Items, gold, quest rewards…"></textarea>
+                </div>
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-notes">Notes</label>
+                  <textarea id="npc-notes" class="char-textarea" rows="3" placeholder="Relationships, plot hooks, GM notes…"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="npc-editor-status" class="editor-status"></div>
+        </div>
+
+      </div><!-- /char-npc-panel -->
+
     </section>
 
     <!-- Sessions Section -->
