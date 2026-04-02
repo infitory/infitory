@@ -1044,51 +1044,17 @@ btnExportSystem.addEventListener('click', () => {
 
 // ── Pre-built system loader ───────────────────────────────────
 
-const PREBUILT_FILES = [
-  'dnd5e-2024.md', 'pathfinder2e.md', 'starfinder.md',
-  'call-of-cthulhu-7e.md', 'vampire-the-masquerade-5e.md',
-  'shadowrun-6e.md', 'cyberpunk-red.md',
-  'blades-in-the-dark.md', 'fate-core.md',
-];
-
-function extractSystemName(content) {
-  const lines = content.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() === '# System name') {
-      for (let j = i + 1; j < lines.length; j++) {
-        const t = lines[j].trim();
-        if (t && !t.startsWith('#') && !t.startsWith('<!--')) return t;
-      }
-    }
-  }
-  const h1 = lines.find(l => /^# [^#]/.test(l));
-  return h1 ? h1.slice(2).trim() : 'Unknown System';
-}
-
-async function loadPrebuiltSystems() {
+function loadPrebuiltSystems() {
   if (allSystemKeys().length > 0) return; // already populated
 
   let loaded = 0;
-  let fetchFailed = false;
-  for (const file of PREBUILT_FILES) {
-    try {
-      const res = await fetch(`systems/${file}`);
-      if (!res.ok) continue;
-      const content = await res.text();
-      const name    = extractSystemName(content);
-      const key     = systemNameToKey(name);
-      if (!localStorage.getItem(key)) {
-        saveSystem(key, { name, content, updatedAt: new Date().toISOString() });
-        loaded++;
-      }
-    } catch {
-      fetchFailed = true;
-      break; // file:// CORS — no point continuing
+  for (const [name, content] of Object.entries(BUNDLED_SYSTEMS)) {
+    if (!content) continue; // skip placeholder empty strings
+    const key = systemNameToKey(name);
+    if (!localStorage.getItem(key)) {
+      saveSystem(key, { name, content, updatedAt: new Date().toISOString() });
+      loaded++;
     }
-  }
-
-  if (fetchFailed && loaded === 0) {
-    prebuiltNotice.style.display = '';
   }
 
   if (loaded > 0) {
