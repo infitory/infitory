@@ -330,7 +330,154 @@ Ship stats: HP, Shields (fore/aft/port/starboard), AC, TL, Speed, Maneuverabilit
 ### Conditions
 Bleeding, Blinded, Broken, Burning, Confused, Cowering, Dazed, Dazzled, Dead, Deafened, Dying, Encumbered, Entangled, Exhausted, Fascinated, Fatigued, Flat-Footed, Frightened, Grappled, Helpless, Nauseated, Off-Target, Overburdened, Panicked, Paralyzed, Pinned, Prone, Shaken, Sickened, Stable, Staggered, Stunned, Unconscious
 `,
-  "Call of Cthulhu 7e": ``,
+  "Call of Cthulhu 7e": `# System name
+Call of Cthulhu 7e
+
+## Description
+Call of Cthulhu by Chaosium. A horror roleplaying game set in the 1920s (or other eras) based on the works of H.P. Lovecraft. Investigators uncover cosmic horrors that slowly erode their sanity. The system uses percentile dice (d100) — roll under your skill value to succeed. Characters are fragile, sanity is precious, and death is often preferable to what waits beyond.
+
+## Attributes
+Strength | STR | number | min:1 | max:100
+Constitution | CON | number | min:1 | max:100
+Size | SIZ | number | min:1 | max:100
+Dexterity | DEX | number | min:1 | max:100
+Appearance | APP | number | min:1 | max:100
+Intelligence | INT | number | min:1 | max:100
+Power | POW | number | min:1 | max:100
+Education | EDU | number | min:1 | max:100
+
+## Derived stats
+- Hit Points = (CON + SIZ) / 10, rounded down
+- Sanity (starting) = POW
+- Sanity (max) = 99 minus Cthulhu Mythos skill
+- Magic Points = POW / 5, rounded down
+- Luck = 3d6 x 5 (rolled separately, not averaged)
+- Damage Bonus: based on STR + SIZ total (see table)
+- Build: -2 (under 64), -1 (65-84), 0 (85-124), +1 (125-164), +2 (165-204)
+- Move Rate: 7 (standard); modified by STR/DEX/SIZ comparisons with opponents
+- Half skill value = regular difficulty threshold
+- Fifth of skill value = hard difficulty threshold
+
+## Character fields
+Name | text
+Player Name | text
+Occupation | text
+Age | number
+Gender | text
+Residence | text
+Birthplace | text
+Era | select | 1920s, Modern Day, Dark Ages, Gaslight (Victorian), Ancient Rome, Custom
+Hit Points (Max) | number
+Hit Points (Current) | number
+Sanity (Max) | number
+Sanity (Current) | number
+Magic Points (Max) | number
+Magic Points (Current) | number
+Luck | number
+Damage Bonus | text
+Build | number
+Move Rate | number
+Temporary Insanity | checkbox
+Indefinite Insanity | checkbox
+Injuries & Marks | textarea
+Phobias & Manias | textarea
+Fellow Investigators & Contacts | textarea
+Equipment & Cash | textarea
+Treasured Possessions | textarea
+Background & Backstory | textarea
+Cthulhu Mythos Knowledge | number
+Notes | textarea
+
+## Skills
+Accounting | EDU-based
+Anthropology | EDU-based
+Appraise | INT-based
+Archaeology | EDU-based
+Art & Craft (choose) | DEX-based
+Charm | APP-based
+Climb | STR/DEX
+Computer Use | EDU-based
+Credit Rating | varies
+Cthulhu Mythos | none
+Disguise | APP-based
+Dodge | DEX x2
+Drive Auto | DEX-based
+Electrical Repair | INT-based
+Fast Talk | APP-based
+Fighting (Brawl) | STR/DEX
+Firearms (Handgun) | DEX-based
+Firearms (Rifle/Shotgun) | DEX-based
+First Aid | DEX-based
+History | EDU-based
+Intimidate | STR/CHA
+Jump | STR/DEX
+Language (Other) | EDU-based
+Language (Own) | EDU x5
+Law | EDU-based
+Library Use | INT-based
+Listen | INT-based
+Locksmith | DEX-based
+Mechanical Repair | DEX-based
+Medicine | EDU-based
+Natural World | INT/EDU
+Navigate | INT-based
+Occult | INT-based
+Persuade | APP-based
+Psychology | INT-based
+Psychoanalysis | EDU-based
+Science (choose) | EDU-based
+Sleight of Hand | DEX-based
+Spot Hidden | INT-based
+Stealth | DEX-based
+Survival | INT-based
+Swim | STR/CON
+Throw | DEX-based
+Track | INT-based
+
+## Dice
+All skill checks: roll d100, succeed if result is equal to or under skill value
+Regular success: roll equal to or under skill value
+Hard success: roll equal to or under half skill value
+Extreme success: roll equal to or under one fifth of skill value
+Fumble: roll 96-100 (or 100 if skill is 50 or less)
+
+Bonus die: roll 2d10 for the tens digit, take the lower — awarded by the Keeper for favourable circumstances
+Penalty die: roll 2d10 for the tens digit, take the higher — imposed for unfavourable circumstances
+
+Opposed checks: both roll; higher level of success wins (ties go to higher skill)
+
+Damage:
+- Fist/kick: 1d3 + DB
+- Small knife: 1d4 + DB
+- Handgun: 1d10
+- Rifle: 2d6+4
+- Shotgun: 4d6 (close range)
+
+Sanity loss: varies by encounter — e.g. seeing a ghoul: 0/1d6 (success/fail)
+
+## Notes
+### Sanity
+Sanity Points (SAN) range from 0 to 99.
+Losing 5+ SAN in one roll = temporary insanity.
+Losing 20% of current SAN in one session = indefinite insanity.
+At SAN 0: permanent insanity.
+Recovery: Psychoanalysis skill, time, successful adventures.
+Learning Cthulhu Mythos permanently lowers maximum Sanity.
+
+### Combat
+Initiative: DEX order (highest first). No separate roll.
+On your turn: 1 action (attack, use item, cast spell, move, etc.)
+Fighting back: choose to fight back (opposed roll) instead of Dodge — if you lose, you take damage
+Dodge: use Dodge skill to avoid an attack entirely
+
+### Pushing a Roll
+If you fail a skill check, you may push it once — attempt again with a penalty.
+If you fail the pushed roll, something bad happens (Keeper decides).
+Some skills cannot be pushed (Cthulhu Mythos, Luck).
+
+### Eras
+The default era is the 1920s. The Keeper can set the game in modern day, the Victorian era, ancient history, or any custom era — adjust available skills and equipment accordingly.
+`,
   "Vampire: the Masquerade 5e": ``,
   "Shadowrun 6e": ``,
   "Cyberpunk RED": ``,
