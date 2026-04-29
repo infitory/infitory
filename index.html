@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TTRPG Manager</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<button id="hamburger" aria-label="Open menu">&#9776;</button>
+<div id="mobile-overlay"></div>
+
+<div id="app">
+  <aside id="sidebar">
+    <div id="sidebar-header">
+      <span class="logo">&#9880;</span>
+      <span class="app-name">TTRPG Manager</span>
+    </div>
+    <nav id="sidebar-nav">
+      <button class="nav-item active" data-section="home">
+        <span class="nav-icon">&#8962;</span> Home
+      </button>
+      <button class="nav-item" data-section="systems">
+        <span class="nav-icon">&#128218;</span> Systems
+      </button>
+      <button class="nav-item" data-section="characters">
+        <span class="nav-icon">&#128100;</span> Characters
+        <span id="char-nav-badge" class="nav-badge" style="display:none;"></span>
+      </button>
+      <button class="nav-item" data-section="sessions">
+        <span class="nav-icon">&#128203;</span> Sessions
+      </button>
+      <button class="nav-item" data-section="dice">
+        <span class="nav-icon">&#127922;</span> Dice Roller
+      </button>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <!-- Home Section -->
+    <section id="section-home" class="section active">
+      <input id="campaign-name-input" class="campaign-name-input"
+        type="text" placeholder="Name your campaign…" spellcheck="false" maxlength="80" />
+
+      <div class="home-stats">
+        <div class="stat-card" data-nav="systems">
+          <span id="stat-systems" class="stat-number">0</span>
+          <span class="stat-label">Systems</span>
+        </div>
+        <div class="stat-card" data-nav="sessions">
+          <span id="stat-sessions" class="stat-number">0</span>
+          <span class="stat-label">Sessions</span>
+        </div>
+        <div class="stat-card" data-nav="characters">
+          <span id="stat-characters" class="stat-number">0</span>
+          <span class="stat-label">Characters</span>
+        </div>
+      </div>
+
+      <div class="home-panels">
+        <div class="home-panel">
+          <p class="home-panel-label">Quick roll</p>
+          <button id="btn-quick-d20" class="quick-d20-btn">
+            <span class="quick-d20-label">d20</span>
+            <span id="quick-d20-result" class="quick-d20-result"></span>
+          </button>
+        </div>
+        <div class="home-panel">
+          <p class="home-panel-label">Data</p>
+          <div class="home-data-btns">
+            <button id="btn-export-all" class="btn-secondary">&#8659;&nbsp; Export backup</button>
+            <button id="btn-import-data" class="btn-secondary">&#8657;&nbsp; Import backup</button>
+          </div>
+          <input id="import-file-input" type="file" accept=".json" style="display:none" />
+        </div>
+      </div>
+
+      <div class="home-recent">
+        <p class="home-panel-label">Recent sessions</p>
+        <div id="home-recent-list" class="home-recent-sessions"></div>
+      </div>
+
+      <p id="prebuilt-notice" class="prebuilt-notice" style="display:none;">
+        &#9432;&nbsp; Serve this app via a local server to auto-load the bundled rulebooks:
+        <code>python -m http.server 8080</code>
+      </p>
+    </section>
+
+    <!-- Systems Section -->
+    <section id="section-systems" class="section">
+      <div id="systems-list-view">
+        <div class="section-header">
+          <h1>Systems</h1>
+          <button id="btn-new-system" class="btn-primary">+ New System</button>
+        </div>
+        <p class="section-subtitle">Your loaded game rulebooks.</p>
+        <div id="systems-list"></div>
+        <div id="systems-empty" class="empty-state" style="display:none;">
+          <span class="empty-icon">&#128218;</span>
+          <p>No systems yet. Create your first one!</p>
+        </div>
+      </div>
+
+      <div id="systems-editor-view" style="display:none;">
+        <div class="editor-header">
+          <button id="btn-back-systems" class="btn-back">&#8592; Back</button>
+          <input id="system-name-input" class="system-name-input" type="text" placeholder="System name..." />
+          <div class="editor-actions">
+            <button id="btn-export-system" class="btn-secondary">Export .md</button>
+            <button id="btn-delete-system" class="btn-danger">Delete</button>
+            <button id="btn-save-system" class="btn-primary">Save</button>
+          </div>
+        </div>
+        <div class="editor-body">
+          <textarea id="system-editor" spellcheck="false" placeholder="Write your system rules in Markdown..."></textarea>
+        </div>
+        <div id="editor-status" class="editor-status"></div>
+      </div>
+    </section>
+
+    <!-- Characters Section -->
+    <section id="section-characters" class="section">
+
+      <!-- Sub-tab bar -->
+      <div class="char-tabs-bar">
+        <button class="char-tab-btn active" data-char-tab="pc">Player Characters</button>
+        <button class="char-tab-btn" data-char-tab="npc">NPCs</button>
+      </div>
+
+      <!-- ── PC panel ─────────────────────────────────────── -->
+      <div id="char-pc-panel" class="char-tab-panel active">
+
+        <!-- PC list view -->
+        <div id="pc-list-view" class="char-list-view">
+          <div class="section-header">
+            <h1>Player Characters</h1>
+            <div class="char-header-controls">
+              <input id="pc-search" class="char-search" type="text" placeholder="Search PCs…" />
+              <button id="btn-new-pc" class="btn-primary">+ New PC</button>
+            </div>
+          </div>
+          <div id="pc-list" class="char-cards-list"></div>
+          <div id="pc-empty" class="empty-state" style="display:none;">
+            <span class="empty-icon">&#128100;</span>
+            <p>No player characters yet. Create your first one!</p>
+          </div>
+        </div>
+
+        <!-- PC editor view -->
+        <div id="pc-editor-view" class="char-editor-view" style="display:none;">
+          <div class="char-editor-header">
+            <button id="btn-back-pc" class="btn-back">&#8592; Back</button>
+            <span id="pc-editor-title" class="char-editor-title">New Character</span>
+            <div class="editor-actions">
+              <button id="btn-delete-pc" class="btn-danger">Delete</button>
+              <button id="btn-save-pc" class="btn-primary">Save</button>
+            </div>
+          </div>
+          <div class="char-system-bar">
+            <label class="char-field-label" for="pc-system-select">System</label>
+            <select id="pc-system-select" class="char-system-select"></select>
+          </div>
+          <div id="pc-form-container" class="char-form-scroll"></div>
+          <div id="pc-editor-status" class="editor-status"></div>
+        </div>
+
+      </div><!-- /char-pc-panel -->
+
+      <!-- ── NPC panel ────────────────────────────────────── -->
+      <div id="char-npc-panel" class="char-tab-panel" style="display:none;">
+
+        <!-- NPC list view -->
+        <div id="npc-list-view" class="char-list-view">
+          <div class="section-header">
+            <h1>Non-Player Characters</h1>
+            <div class="char-header-controls">
+              <input id="npc-search" class="char-search" type="text" placeholder="Search NPCs…" />
+              <select id="npc-status-filter" class="char-status-filter">
+                <option value="">All statuses</option>
+                <option>Alive</option>
+                <option>Dead</option>
+                <option>Unknown</option>
+                <option>Allied</option>
+                <option>Hostile</option>
+                <option>Neutral</option>
+              </select>
+              <button id="btn-new-npc" class="btn-primary">+ New NPC</button>
+            </div>
+          </div>
+          <div id="npc-list" class="char-cards-list"></div>
+          <div id="npc-empty" class="empty-state" style="display:none;">
+            <span class="empty-icon">&#128123;</span>
+            <p>No NPCs yet. Add your first ally or villain!</p>
+          </div>
+        </div>
+
+        <!-- NPC editor view -->
+        <div id="npc-editor-view" class="char-editor-view" style="display:none;">
+          <div class="char-editor-header">
+            <button id="btn-back-npc" class="btn-back">&#8592; Back</button>
+            <span id="npc-editor-title" class="char-editor-title">New NPC</span>
+            <div class="editor-actions">
+              <button id="btn-delete-npc" class="btn-danger">Delete</button>
+              <button id="btn-save-npc" class="btn-primary">Save</button>
+            </div>
+          </div>
+          <div id="npc-form-container" class="char-form-scroll">
+            <div class="char-form-section">
+              <div class="char-form-section-title">Identity</div>
+              <div class="char-form-group">
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-name">Name <span class="char-required">*</span></label>
+                  <input id="npc-name" type="text" class="char-input" placeholder="Character name…" />
+                </div>
+                <div class="char-field">
+                  <label class="char-field-label" for="npc-role">Role / Type</label>
+                  <input id="npc-role" type="text" class="char-input" placeholder="Merchant, Guard Captain…" />
+                </div>
+                <div class="char-field">
+                  <label class="char-field-label" for="npc-system-select">System</label>
+                  <select id="npc-system-select" class="char-input"></select>
+                </div>
+                <div class="char-field">
+                  <label class="char-field-label" for="npc-cr">CR / Threat Level</label>
+                  <input id="npc-cr" type="text" class="char-input" placeholder="CR 5, Threat 3…" />
+                </div>
+                <div class="char-field">
+                  <label class="char-field-label" for="npc-status">Status</label>
+                  <select id="npc-status" class="char-input">
+                    <option value="Alive">Alive</option>
+                    <option value="Dead">Dead</option>
+                    <option value="Unknown">Unknown</option>
+                    <option value="Allied">Allied</option>
+                    <option value="Hostile">Hostile</option>
+                    <option value="Neutral">Neutral</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="char-form-section">
+              <div class="char-form-section-title">Details</div>
+              <div class="char-form-group">
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-description">Description</label>
+                  <textarea id="npc-description" class="char-textarea" rows="3" placeholder="Appearance, personality, mannerisms…"></textarea>
+                </div>
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-stats">Stats Summary</label>
+                  <textarea id="npc-stats" class="char-textarea" rows="2" placeholder="HP: 45, AC: 16, ATK: +7…"></textarea>
+                </div>
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-abilities">Abilities &amp; Traits</label>
+                  <textarea id="npc-abilities" class="char-textarea" rows="3" placeholder="Special abilities, traits, spells…"></textarea>
+                </div>
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-loot">Loot / Rewards</label>
+                  <textarea id="npc-loot" class="char-textarea" rows="2" placeholder="Items, gold, quest rewards…"></textarea>
+                </div>
+                <div class="char-field char-field-full">
+                  <label class="char-field-label" for="npc-notes">Notes</label>
+                  <textarea id="npc-notes" class="char-textarea" rows="3" placeholder="Relationships, plot hooks, GM notes…"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="npc-editor-status" class="editor-status"></div>
+        </div>
+
+      </div><!-- /char-npc-panel -->
+
+    </section>
+
+    <!-- Sessions Section -->
+    <section id="section-sessions" class="section">
+
+      <div id="sessions-list-view">
+        <div class="section-header">
+          <h1>Sessions</h1>
+          <button id="btn-new-session" class="btn-primary">+ New Session</button>
+        </div>
+        <p class="section-subtitle">Your game session logs.</p>
+        <div id="sessions-list"></div>
+        <div id="sessions-empty" class="empty-state" style="display:none;">
+          <span class="empty-icon">&#128203;</span>
+          <p>No sessions yet. Start your first one!</p>
+        </div>
+      </div>
+
+      <div id="sessions-editor-view" style="display:none;">
+        <div class="session-editor-header">
+          <button id="btn-back-session" class="btn-back">&#8592; Back</button>
+          <input id="session-title-input" class="session-title-input" type="text" placeholder="Session title..." />
+          <input id="session-date-input" type="date" class="session-date-input" />
+          <select id="session-system-select" class="session-system-select">
+            <option value="">&#8212; No system &#8212;</option>
+          </select>
+          <div class="editor-actions">
+            <button id="btn-delete-session" class="btn-danger">Delete</button>
+            <button id="btn-save-session" class="btn-primary">Save</button>
+          </div>
+        </div>
+
+        <div class="session-editor-body">
+          <div class="notes-panel">
+            <div class="panel-tabs">
+              <button class="tab-btn active" data-tab="edit">Edit</button>
+              <button class="tab-btn" data-tab="preview">Preview</button>
+            </div>
+            <textarea id="session-notes" class="notes-editor" spellcheck="false"
+              placeholder="Write session notes in Markdown..."></textarea>
+            <div id="session-notes-preview" class="notes-preview" style="display:none;"></div>
+          </div>
+
+          <div class="initiative-panel">
+            <div class="initiative-header">
+              <h3>Initiative</h3>
+              <button id="btn-clear-combat" class="btn-ghost-sm">Clear</button>
+            </div>
+            <div id="combatants-list" class="combatants-list"></div>
+            <div class="initiative-footer">
+              <button id="btn-next-turn" class="btn-primary btn-block">&#9654; Next Turn</button>
+              <div class="add-combatant-form">
+                <input id="combatant-name" type="text" placeholder="Name" class="combatant-name-input" />
+                <input id="combatant-init" type="number" placeholder="0" class="combatant-init-input" />
+                <button id="btn-add-combatant" class="btn-primary">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="session-editor-status" class="editor-status"></div>
+      </div>
+    </section>
+
+    <!-- Dice Roller Section -->
+    <section id="section-dice" class="section">
+      <div class="section-header">
+        <h1>Dice Roller</h1>
+        <button id="btn-clear-dice-history" class="btn-ghost-sm">Clear history</button>
+      </div>
+      <p class="section-subtitle">Quick rolls and custom expressions.</p>
+
+      <div class="dice-layout">
+        <div class="dice-roller-panel">
+          <div class="dice-group">
+            <p class="dice-group-label">Quick roll</p>
+            <div class="dice-quick-grid">
+              <button class="dice-btn" data-sides="4">d4</button>
+              <button class="dice-btn" data-sides="6">d6</button>
+              <button class="dice-btn" data-sides="8">d8</button>
+              <button class="dice-btn" data-sides="10">d10</button>
+              <button class="dice-btn" data-sides="12">d12</button>
+              <button class="dice-btn" data-sides="20">d20</button>
+              <button class="dice-btn" data-sides="100">d%</button>
+            </div>
+          </div>
+
+          <div class="dice-group">
+            <p class="dice-group-label">Expression</p>
+            <div class="dice-expr-row">
+              <input id="dice-expr-input" type="text" class="dice-expr-input"
+                placeholder="2d6+3, d20, 4d8-1…" spellcheck="false" autocomplete="off" />
+              <button id="btn-roll-expr" class="btn-primary">Roll</button>
+            </div>
+            <p class="dice-expr-hint">Format: XdY+Z &nbsp;·&nbsp;
+              e.g. <code>d20</code> &nbsp;<code>2d6+3</code> &nbsp;<code>4d6</code></p>
+          </div>
+
+          <div id="dice-result-card" class="dice-result-card" style="display:none;">
+            <div id="dice-result-total" class="dice-result-total"></div>
+            <div class="dice-result-detail">
+              <div id="dice-result-expr-label" class="dice-result-expr-label"></div>
+              <div id="dice-result-breakdown" class="dice-result-breakdown"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dice-history-panel">
+          <p class="dice-group-label">History</p>
+          <div id="dice-history-list" class="dice-history-list">
+            <p class="dice-history-empty">No rolls yet.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="modal-overlay" style="display:none;">
+  <div id="modal">
+    <h2 id="modal-title">New System</h2>
+    <p id="modal-body">Enter a name for your new system:</p>
+    <input id="modal-input" type="text" placeholder="e.g. D&amp;D 5e, Pathfinder, Cairn..." />
+    <div class="modal-actions">
+      <button id="modal-cancel" class="btn-secondary">Cancel</button>
+      <button id="modal-confirm" class="btn-primary">Create</button>
+    </div>
+  </div>
+</div>
+
+<script src="systems-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
