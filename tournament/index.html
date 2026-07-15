@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tournify — Gestionnaire de tournois</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">🏆 <span>Tournify</span></div>
+      <nav class="nav">
+        <button class="nav-btn active" data-view="tournaments">Tournois</button>
+        <button class="nav-btn" data-view="create">Nouveau tournoi</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="app" class="container">
+    <!-- Vue : liste des tournois -->
+    <section id="view-tournaments" class="view active">
+      <div class="view-header">
+        <h1>Mes tournois</h1>
+        <button class="btn btn-primary" data-goto="create">+ Nouveau tournoi</button>
+      </div>
+      <div id="tournament-list" class="card-grid"></div>
+      <div id="tournaments-empty" class="empty-state hidden">
+        <div class="empty-icon">🏟️</div>
+        <h2>Aucun tournoi pour l'instant</h2>
+        <p>Créez votre premier tournoi pour commencer.</p>
+        <button class="btn btn-primary" data-goto="create">Créer un tournoi</button>
+      </div>
+    </section>
+
+    <!-- Vue : création de tournoi -->
+    <section id="view-create" class="view">
+      <div class="view-header">
+        <h1>Nouveau tournoi</h1>
+      </div>
+      <form id="create-form" class="panel">
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="t-name">Nom du tournoi</label>
+            <input type="text" id="t-name" placeholder="ex : Coupe d'été 2026" required>
+          </div>
+          <div class="form-field">
+            <label for="t-discipline">Discipline</label>
+            <select id="t-discipline"></select>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label>Format du tournoi</label>
+          <div id="format-cards" class="format-grid"></div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="t-teamcount">Nombre d'équipes</label>
+            <select id="t-teamcount"></select>
+          </div>
+          <div class="form-field">
+            <label for="t-teamsize">Joueurs par équipe</label>
+            <input type="number" id="t-teamsize" min="1" max="15" value="5">
+          </div>
+          <div class="form-field" id="swiss-rounds-field" style="display:none">
+            <label for="t-swissrounds">Nombre de rondes (Swiss)</label>
+            <input type="number" id="t-swissrounds" min="1" max="15" value="5">
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label>Équipes &amp; joueurs</label>
+          <div class="radio-row">
+            <label class="radio-card">
+              <input type="radio" name="team-source" value="random" checked>
+              <div><strong>🎲 Génération aléatoire</strong><small>Noms d'équipes et de joueurs générés automatiquement</small></div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="team-source" value="csv">
+              <div><strong>📄 Import CSV</strong><small>Colonnes : équipe, joueur (une ligne par joueur)</small></div>
+            </label>
+          </div>
+          <div id="csv-zone" class="csv-zone hidden">
+            <input type="file" id="csv-file" accept=".csv,.txt">
+            <p class="hint">Format attendu : <code>equipe,joueur</code> — une ligne par joueur.
+              <a href="#" id="csv-example">Télécharger un exemple</a></p>
+            <div id="csv-preview" class="csv-preview"></div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn" data-goto="tournaments">Annuler</button>
+          <button type="submit" class="btn btn-primary">Créer le tournoi</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Vue : détail d'un tournoi -->
+    <section id="view-detail" class="view">
+      <div id="detail-content"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
