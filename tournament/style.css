@@ -235,6 +235,106 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   margin-top: 1rem;
 }
 
+/* ===== Onglets (détail tournoi) ===== */
+.tabs { display: flex; gap: 0.4rem; margin: 1.2rem 0 1rem; flex-wrap: wrap; }
+.tab-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.tab-btn:hover { color: var(--text); background: var(--panel); }
+.tab-btn.active { color: var(--accent); background: var(--panel); border-color: var(--accent); }
+
+/* ===== Bracket (éliminations) ===== */
+.bracket {
+  display: flex;
+  gap: 1.2rem;
+  overflow-x: auto;
+  padding: 0.5rem 0 1rem;
+  align-items: stretch;
+}
+.bracket-round {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 0.8rem;
+  min-width: 215px;
+  flex-shrink: 0;
+}
+.round-title {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  text-align: center;
+}
+.match {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.match.done { border-color: rgba(61, 220, 132, 0.35); }
+.match.bye { opacity: 0.6; }
+.mrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.88rem;
+}
+.mrow + .mrow { border-top: 1px solid var(--border); }
+.mrow.win { background: rgba(61, 220, 132, 0.08); }
+.mrow.win .mteam { color: var(--green); font-weight: 600; }
+.mteam { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mscore { color: var(--text-dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.tbd { color: var(--text-dim); font-style: italic; }
+
+/* ===== Rondes (round robin / suisse) ===== */
+.round-block { margin-bottom: 1.3rem; }
+.round-block .round-title { text-align: left; margin-bottom: 0.5rem; }
+.round-block .round-matches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
+  gap: 0.7rem;
+}
+.round-block.future {
+  opacity: 0.6;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+}
+
+/* ===== Classement ===== */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+table.standings { width: 100%; border-collapse: collapse; background: var(--panel); }
+.standings th, .standings td {
+  padding: 0.55rem 0.8rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.standings th { color: var(--text-dim); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.standings td:nth-child(2), .standings th:nth-child(2) { text-align: left; width: 100%; }
+.standings tbody tr:last-child td { border-bottom: none; }
+.standings tbody tr:hover { background: var(--panel-2); }
+.standings .tag {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(245, 166, 35, 0.1);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  margin-right: 0.3rem;
+}
+
 /* ===== Toast ===== */
 .toast {
   position: fixed;
