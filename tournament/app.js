@@ -20,6 +20,21 @@ const DISCIPLINES = [
   { id: 'custom',   label: 'Autre / personnalisé',       teamSize: 5, roles: [] },
 ];
 
+/* Modèle de score par discipline (utilisé par la simulation) :
+ * - bo     : best-of N manches (esports, volley) → 2-1, 3-2…
+ * - goals  : buts (football) → 2-1, 0-0…, nuls possibles en round robin
+ * - points : gros scores (basket) → 102-96… */
+const SCORE_MODELS = {
+  lol:      { kind: 'bo', sets: 3 },
+  cs2:      { kind: 'bo', sets: 3 },
+  valorant: { kind: 'bo', sets: 3 },
+  rl:       { kind: 'bo', sets: 5 },
+  football: { kind: 'goals', max: 5, draw: true },
+  basket:   { kind: 'points', min: 60, max: 130 },
+  volley:   { kind: 'bo', sets: 5 },
+  custom:   { kind: 'bo', sets: 3 },
+};
+
 const FORMATS = [
   { id: 'single_elim', label: 'Élimination simple', icon: '🗡️',
     desc: 'Bracket classique : une défaite et c\'est terminé.' },
@@ -245,6 +260,8 @@ function renderTournamentList() {
         <span>🎮 ${esc(t.disciplineLabel)}</span>
         <span>👥 ${t.teams.length} équipes</span>
         <span>📅 ${new Date(t.createdAt).toLocaleDateString('fr-FR')}</span>
+        ${t.status === 'finished' && t.championId
+          ? `<span class="champ">🏆 ${esc(t.teams.find(x => x.id === t.championId)?.name ?? '')}</span>` : ''}
       </div>
     </div>
   `).join('');
@@ -443,6 +460,226 @@ function propagate(t) {
   }
 }
 
+/* =========================================================
+ * Étape 3 : simulation des matchs & statistiques
+ * ========================================================= */
+
+/** Matchs prêts à être joués (deux vraies équipes connues). */
+function readyMatches(t) {
+  return allMatches(t).filter(m =>
+    m.status === 'pending' &&
+    m.a.teamId && m.b.teamId &&
+    m.a.teamId !== BYE && m.b.teamId !== BYE);
+}
+
+/** Répartit `total` en `n` parts entières aléatoires (somme exacte). */
+function distribute(total, n) {
+  const weights = Array.from({ length: n }, () => Math.random() + 0.1);
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const parts = weights.map(w => Math.floor(total * w / sum));
+  let rest = total - parts.reduce((a, b) => a + b, 0);
+  while (rest > 0) { parts[Math.floor(Math.random() * n)]++; rest--; }
+  return parts;
+}
+
+function genScore(model) {
+  if (model.kind === 'goals') {
+    const w = 1 + Math.floor(Math.random() * model.max);
+    return [w, Math.floor(Math.random() * w)];
+  }
+  if (model.kind === 'points') {
+    const w = model.min + Math.floor(Math.random() * (model.max - model.min));
+    return [w, w - (1 + Math.floor(Math.random() * 25))];
+  }
+  // best-of N
+  const w = Math.ceil(model.sets / 2);
+  return [w, Math.floor(Math.random() * w)];
+}
+
+/**
+ * Simule un match : vainqueur tiré selon un Elo caché, score selon la
+ * discipline, mise à jour des stats équipes/joueurs, MVP et ratings.
+ */
+function simulateMatch(t, m) {
+  const ta = teamById(t, m.a.teamId);
+  const tb = teamById(t, m.b.teamId);
+  if (!ta || !tb) return;
+  const model = SCORE_MODELS[t.disciplineId] || SCORE_MODELS.custom;
+  const pa = 1 / (1 + Math.pow(10, (tb.rating - ta.rating) / 400));
+
+  const allowDraw = !!model.draw && t.format === 'round_robin';
+  let winner; // 'a' | 'b' | null (nul)
+  if (allowDraw && Math.random() < 0.22) {
+    winner = null;
+    m.scoreA = m.scoreB = Math.floor(Math.random() * model.max);
+  } else {
+    winner = Math.random() < pa ? 'a' : 'b';
+    const [sw, sl] = genScore(model);
+    m.scoreA = winner === 'a' ? sw : sl;
+    m.scoreB = winner === 'b' ? sw : sl;
+  }
+  m.winnerId = winner === 'a' ? ta.id : winner === 'b' ? tb.id : null;
+  m.loserId = winner === 'a' ? tb.id : winner === 'b' ? ta.id : null;
+  m.status = 'done';
+
+  // Stats d'équipe
+  const apply = (team, own, opp, res) => {
+    team.stats.matches++;
+    team.stats.scoreFor += own;
+    team.stats.scoreAgainst += opp;
+    if (res === 'w') { team.stats.wins++; team.stats.points += 3; }
+    else if (res === 'd') { team.stats.draws++; team.stats.points += 1; }
+    else team.stats.losses++;
+  };
+  apply(ta, m.scoreA, m.scoreB, winner === 'a' ? 'w' : winner === null ? 'd' : 'l');
+  apply(tb, m.scoreB, m.scoreA, winner === 'b' ? 'w' : winner === null ? 'd' : 'l');
+
+  // Stats des joueurs : contribution au score + éventuel MVP côté vainqueur
+  const contributions = new Map();
+  for (const [team, teamScore, won] of [[ta, m.scoreA, winner === 'a'], [tb, m.scoreB, winner === 'b']]) {
+    const parts = model.kind === 'bo'
+      ? team.players.map(() => 5 + Math.floor(Math.random() * 20) + (won ? 5 : 0)) // perf type frags
+      : distribute(teamScore, team.players.length);                                // buts / points réels
+    team.players.forEach((p, i) => {
+      p.stats.matches++;
+      if (winner !== null) { won ? p.stats.wins++ : p.stats.losses++; }
+      p.stats.score += parts[i];
+      contributions.set(p.id, parts[i]);
+    });
+  }
+  if (winner !== null) {
+    const winTeam = winner === 'a' ? ta : tb;
+    const mvp = [...winTeam.players].sort((x, y) => contributions.get(y.id) - contributions.get(x.id))[0];
+    if (mvp) mvp.stats.mvp++;
+  }
+
+  // Mise à jour Elo (rating caché)
+  const K = 24;
+  const sa = winner === 'a' ? 1 : winner === null ? 0.5 : 0;
+  ta.rating = Math.round(ta.rating + K * (sa - pa));
+  tb.rating = Math.round(tb.rating + K * ((1 - sa) - (1 - pa)));
+}
+
+/* --- Rondes suisses suivantes, générées d'après le classement --- */
+
+function pairKey(a, b) { return a < b ? `${a}|${b}` : `${b}|${a}`; }
+
+function generateNextSwissRound(t) {
+  const s = t.schedule;
+  const roundNo = s.rounds.length + 1;
+  const played = new Set();
+  const hadBye = new Set();
+  for (const m of allMatches(t)) {
+    if (m.a.teamId === BYE || m.b.teamId === BYE) {
+      hadBye.add(m.a.teamId === BYE ? m.b.teamId : m.a.teamId);
+    } else if (m.a.teamId && m.b.teamId) {
+      played.add(pairKey(m.a.teamId, m.b.teamId));
+    }
+  }
+
+  const ids = computeStandings(t).map(r => r.team.id);
+  const matches = [];
+
+  // Nombre impair : exempt pour la moins bien classée n'ayant pas encore eu de bye
+  if (ids.length % 2 === 1) {
+    let byeIdx = ids.length - 1;
+    for (let i = ids.length - 1; i >= 0; i--) {
+      if (!hadBye.has(ids[i])) { byeIdx = i; break; }
+    }
+    const byeTeam = ids.splice(byeIdx, 1)[0];
+    const m = makeMatch('SW', roundNo, 0);
+    m.a.teamId = byeTeam;
+    m.b.teamId = BYE;
+    matches.push(m);
+  }
+
+  // Appariement glouton : voisin de classement, en évitant les re-matchs
+  while (ids.length) {
+    const a = ids.shift();
+    let idx = ids.findIndex(b => !played.has(pairKey(a, b)));
+    if (idx === -1) idx = 0;
+    const b = ids.splice(idx, 1)[0];
+    const m = makeMatch('SW', roundNo, matches.length);
+    m.a.teamId = a;
+    m.b.teamId = b;
+    matches.push(m);
+  }
+  s.rounds.push(matches);
+}
+
+/* --- Avancement / fin de tournoi --- */
+
+function swissRoundPending(t) {
+  const s = t.schedule;
+  return s.type === 'swiss' && s.rounds.length < s.totalRounds &&
+    allMatches(t).every(m => m.status === 'done');
+}
+
+function maybeFinish(t) {
+  if (t.status !== 'ongoing') return;
+  const s = t.schedule;
+  if (s.type === 'swiss' && s.rounds.length < s.totalRounds) return;
+  if (!allMatches(t).every(m => m.status === 'done')) return;
+  if (s.type === 'single_elim') t.championId = s.rounds[s.rounds.length - 1][0].winnerId;
+  else if (s.type === 'double_elim') t.championId = s.gf.winnerId;
+  else t.championId = computeStandings(t)[0]?.team.id ?? null;
+  t.status = 'finished';
+  const champ = teamById(t, t.championId);
+  if (champ) toast(`🏆 ${champ.name} remporte le tournoi !`);
+}
+
+/** Après une ou plusieurs simulations : propage, génère la ronde suisse
+ *  suivante si besoin, clôture le tournoi, sauvegarde et ré-affiche. */
+function afterSim(t) {
+  propagate(t);
+  if (swissRoundPending(t)) {
+    generateNextSwissRound(t);
+    propagate(t); // résout un éventuel exempt de la nouvelle ronde
+  }
+  maybeFinish(t);
+  saveState();
+  renderTournamentDetail();
+}
+
+function simOne(t) {
+  const ready = readyMatches(t);
+  if (!ready.length) { afterSim(t); return; }
+  simulateMatch(t, ready[0]);
+  afterSim(t);
+}
+
+function simRound(t) {
+  // Simule uniquement la ronde en cours (celle du premier match prêt)
+  const ready = readyMatches(t);
+  if (ready.length) {
+    const ref = ready[0];
+    for (const m of ready.filter(x => x.bracket === ref.bracket && x.round === ref.round)) {
+      simulateMatch(t, m);
+    }
+  }
+  afterSim(t);
+}
+
+function simAll(t) {
+  let guard = 5000;
+  while (guard-- > 0) {
+    propagate(t);
+    const ready = readyMatches(t);
+    if (!ready.length) {
+      if (swissRoundPending(t)) { generateNextSwissRound(t); continue; }
+      break;
+    }
+    simulateMatch(t, ready[0]);
+  }
+  afterSim(t);
+}
+
+function simMatchById(t, matchId) {
+  const m = allMatches(t).find(x => x.id === matchId);
+  if (m && readyMatches(t).includes(m)) simulateMatch(t, m);
+  afterSim(t);
+}
+
 function startTournament(t) {
   if (t.teams.length < 2) { toast('Il faut au moins 2 équipes pour démarrer.', true); return; }
   if (t.format === 'single_elim') t.schedule = generateSingleElim(t);
@@ -461,6 +698,7 @@ function resetTournament(t) {
   if (!confirm(`Réinitialiser « ${t.name} » ? Le bracket et les résultats seront effacés.`)) return;
   t.schedule = null;
   t.status = 'setup';
+  t.championId = null;
   for (const team of t.teams) {
     team.stats = { matches: 0, wins: 0, losses: 0, draws: 0, points: 0, scoreFor: 0, scoreAgainst: 0 };
     for (const p of team.players) p.stats = { matches: 0, wins: 0, losses: 0, score: 0, mvp: 0 };
@@ -533,17 +771,22 @@ function matchRowHtml(t, m, key) {
   </div>`;
 }
 
-function matchCard(t, m) {
+function matchCard(t, m, interactive) {
   const cls = [m.status === 'done' ? 'done' : '', (m.a.teamId === BYE || m.b.teamId === BYE) ? 'bye' : ''].join(' ');
-  return `<div class="match ${cls}">${matchRowHtml(t, m, 'a')}${matchRowHtml(t, m, 'b')}</div>`;
+  const ready = interactive && m.status === 'pending' &&
+    m.a.teamId && m.b.teamId && m.a.teamId !== BYE && m.b.teamId !== BYE;
+  return `<div class="match ${cls}">
+    <div class="match-rows">${matchRowHtml(t, m, 'a')}${matchRowHtml(t, m, 'b')}</div>
+    ${ready ? `<button class="play-btn" data-mid="${m.id}" title="Simuler ce match">▶</button>` : ''}
+  </div>`;
 }
 
-function renderElimBracket(t, rounds, namer) {
+function renderElimBracket(t, rounds, namer, interactive) {
   return `<div class="bracket">
     ${rounds.map((rd, i) => `
       <div class="bracket-round">
         <div class="round-title">${namer(i + 1, rounds.length)}</div>
-        ${rd.map(m => matchCard(t, m)).join('')}
+        ${rd.map(m => matchCard(t, m, interactive)).join('')}
       </div>`).join('')}
   </div>`;
 }
@@ -551,29 +794,37 @@ function renderElimBracket(t, rounds, namer) {
 function renderSchedule(t) {
   const s = t.schedule;
   if (!s) return '<p>Aucun calendrier généré.</p>';
-  const note = `<div class="notice">🎲 La simulation des matchs arrive à l'étape 3 — les résultats rempliront automatiquement ${s.type === 'single_elim' || s.type === 'double_elim' ? 'le bracket' : 'le calendrier et le classement'}.</div>`;
+  const interactive = t.status === 'ongoing';
+
+  const simBar = interactive ? `
+    <div class="sim-bar">
+      <button class="btn btn-sm" id="sim-one">🎲 Simuler 1 match</button>
+      <button class="btn btn-sm" id="sim-round">⏭️ Simuler la ronde</button>
+      <button class="btn btn-primary btn-sm" id="sim-all">⏩ Simuler tout le tournoi</button>
+      <span class="sim-hint">ou cliquez sur ▶ sur un match</span>
+    </div>` : '';
 
   if (s.type === 'single_elim') {
-    return renderElimBracket(t, s.rounds, roundName) + note;
+    return simBar + renderElimBracket(t, s.rounds, roundName, interactive);
   }
 
   if (s.type === 'double_elim') {
     return `
+      ${simBar}
       <h3 class="section-title">⚔️ Winner bracket</h3>
-      ${renderElimBracket(t, s.wb, (r, tot) => roundName(r, tot).replace('🏆 Finale', 'Finale WB'))}
+      ${renderElimBracket(t, s.wb, (r, tot) => roundName(r, tot).replace('🏆 Finale', 'Finale WB'), interactive)}
       ${s.lb.length ? `
         <h3 class="section-title">💀 Loser bracket</h3>
-        ${renderElimBracket(t, s.lb, (r) => `Ronde ${r}`)}` : ''}
+        ${renderElimBracket(t, s.lb, (r) => `Ronde ${r}`, interactive)}` : ''}
       <h3 class="section-title">🏆 Grande finale</h3>
-      ${renderElimBracket(t, [[s.gf]], () => 'Vainqueur WB vs vainqueur LB')}
-      ${note}`;
+      ${renderElimBracket(t, [[s.gf]], () => 'Vainqueur WB vs vainqueur LB', interactive)}`;
   }
 
   // Round robin / suisse : blocs de rondes
   const blocks = s.rounds.map((rd, i) => `
     <div class="round-block">
       <div class="round-title">Ronde ${i + 1}</div>
-      <div class="round-matches">${rd.map(m => matchCard(t, m)).join('')}</div>
+      <div class="round-matches">${rd.map(m => matchCard(t, m, interactive)).join('')}</div>
     </div>`);
 
   if (s.type === 'swiss') {
@@ -585,7 +836,71 @@ function renderSchedule(t) {
         </div>`);
     }
   }
-  return blocks.join('') + note;
+  return simBar + blocks.join('');
+}
+
+/* --- Podium & statistiques --- */
+
+function renderPodium(t) {
+  const champion = teamById(t, t.championId);
+  if (!champion) return '';
+  const s = t.schedule;
+  let second = null;
+  if (s.type === 'single_elim') second = teamById(t, s.rounds[s.rounds.length - 1][0].loserId);
+  else if (s.type === 'double_elim') second = teamById(t, s.gf.loserId);
+  else second = computeStandings(t)[1]?.team ?? null;
+  return `
+    <div class="podium">
+      <span class="podium-champ">🏆 <strong>${esc(champion.name)}</strong> remporte le tournoi !</span>
+      ${second ? `<span class="podium-second">🥈 ${esc(second.name)}</span>` : ''}
+    </div>`;
+}
+
+function renderStatsTab(t) {
+  const teams = [...t.teams].sort((a, b) =>
+    b.stats.points - a.stats.points ||
+    (b.stats.scoreFor - b.stats.scoreAgainst) - (a.stats.scoreFor - a.stats.scoreAgainst));
+  const players = t.teams
+    .flatMap(team => team.players.map(p => ({ p, team })))
+    .sort((x, y) => y.p.stats.mvp - x.p.stats.mvp || y.p.stats.score - x.p.stats.score || y.p.stats.wins - x.p.stats.wins);
+
+  return `
+    <h3 class="section-title">📊 Statistiques des équipes</h3>
+    <div class="table-wrap">
+      <table class="standings">
+        <thead><tr><th>#</th><th>Équipe</th><th>M</th><th>V</th><th>N</th><th>D</th><th>Score +/−</th><th>Pts</th><th>Rating</th></tr></thead>
+        <tbody>${teams.map((team, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td><span class="tag">${esc(team.tag)}</span> ${esc(team.name)}</td>
+            <td>${team.stats.matches}</td><td>${team.stats.wins}</td><td>${team.stats.draws}</td><td>${team.stats.losses}</td>
+            <td>${team.stats.scoreFor}−${team.stats.scoreAgainst}</td>
+            <td><strong>${team.stats.points}</strong></td>
+            <td>${team.rating}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="section-title">⭐ Statistiques des joueurs</h3>
+    <div class="table-wrap">
+      <table class="standings">
+        <thead><tr><th>#</th><th>Joueur</th><th>Équipe</th><th>Rôle</th><th>M</th><th>V</th><th>D</th><th>Score</th><th>MVP</th></tr></thead>
+        <tbody>${players.map(({ p, team }, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${esc(p.name)}</td>
+            <td><span class="tag">${esc(team.tag)}</span></td>
+            <td>${esc(p.role || '—')}</td>
+            <td>${p.stats.matches}</td><td>${p.stats.wins}</td><td>${p.stats.losses}</td>
+            <td>${p.stats.score}</td>
+            <td>${p.stats.mvp ? '⭐ ' + p.stats.mvp : '0'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint-dim">Score = buts/points marqués (sports) ou indice de performance (esports, best-of).
+      Le rating Elo évolue à chaque match simulé.</p>`;
 }
 
 function renderStandings(t) {
@@ -644,13 +959,16 @@ function renderTournamentDetail() {
     const tabs = [
       { id: 'matches', label: hasStandings ? '📅 Rondes' : '🗡️ Bracket' },
       ...(hasStandings ? [{ id: 'standings', label: '📊 Classement' }] : []),
+      { id: 'stats', label: '⭐ Stats' },
       { id: 'teams', label: '👥 Équipes' },
     ];
     if (!tabs.some(x => x.id === detailTab)) detailTab = 'matches';
     const content = detailTab === 'matches' ? renderSchedule(t)
       : detailTab === 'standings' ? renderStandings(t)
+      : detailTab === 'stats' ? renderStatsTab(t)
       : renderTeamsSection(t);
     body = `
+      ${t.status === 'finished' ? renderPodium(t) : ''}
       <div class="tabs">
         ${tabs.map(x => `<button class="tab-btn ${x.id === detailTab ? 'active' : ''}" data-tab="${x.id}">${x.label}</button>`).join('')}
       </div>
@@ -696,6 +1014,18 @@ function renderTournamentDetail() {
   $$('.tab-btn').forEach(b => b.addEventListener('click', () => {
     detailTab = b.dataset.tab;
     renderTournamentDetail();
+  }));
+
+  // Simulation
+  const simOneBtn = $('#sim-one');
+  if (simOneBtn) simOneBtn.addEventListener('click', () => simOne(t));
+  const simRoundBtn = $('#sim-round');
+  if (simRoundBtn) simRoundBtn.addEventListener('click', () => simRound(t));
+  const simAllBtn = $('#sim-all');
+  if (simAllBtn) simAllBtn.addEventListener('click', () => simAll(t));
+  $$('.play-btn').forEach(b => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    simMatchById(t, b.dataset.mid);
   }));
 }
 

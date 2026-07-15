@@ -32,11 +32,13 @@ Les données sont persistées dans le `localStorage` du navigateur.
 - Propagation automatique des vainqueurs dans le bracket + résolution des exempts
 - Réinitialisation d'un tournoi (retour en préparation)
 
-### 🚧 Étape 3 — Simulation & statistiques (à venir)
-- Simulation des matchs (basée sur un rating caché par équipe), match par match ou tournoi complet
-- Génération des rondes suisses suivantes d'après les résultats
-- Statistiques par équipe (V/D, points, différentiel) et par joueur (matchs, score, MVP)
-- Podium / vainqueur du tournoi
+### ✅ Étape 3 — Simulation & statistiques (fait)
+- Simulation des matchs : vainqueur tiré selon un **rating Elo caché** par équipe (mis à jour après chaque match), scores adaptés à la discipline (best-of pour les esports/volley, buts pour le football avec nuls possibles en round robin, gros scores pour le basket)
+- Contrôles : simuler **1 match**, **la ronde en cours**, **tout le tournoi**, ou un match précis via son bouton ▶
+- **Rondes suisses** suivantes générées automatiquement d'après le classement (appariement par voisinage de score, évitement des re-matchs, rotation des exempts)
+- **Statistiques équipes** : matchs, V/N/D, points, score pour/contre, rating Elo
+- **Statistiques joueurs** : matchs, victoires/défaites, score (buts/points ou indice de perf) et **MVP** par match gagné
+- Fin de tournoi automatique : **podium** (champion + finaliste), champion affiché sur la carte du tournoi
 
 ## Format CSV
 
