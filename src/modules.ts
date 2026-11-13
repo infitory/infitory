@@ -14,6 +14,8 @@ export interface AppModule {
   name: string
   icon: LucideIcon
   blurb: string
+  /** True once the module is built; otherwise it shows a "coming soon" page. */
+  ready?: boolean
   /** Which phase of PROJECT_PLAN.md delivers it. */
   phase: string
   features: string[]
@@ -26,6 +28,7 @@ export const MODULES: AppModule[] = [
     icon: BookOpen,
     blurb: 'A self-linking wiki of your NPCs, factions, places, items, events and lore.',
     phase: 'Phase 1',
+    ready: true,
     features: [
       'Pages that link to each other with [[Name]]',
       'Relationship map',
