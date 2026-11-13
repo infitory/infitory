@@ -4,8 +4,7 @@
  */
 
 export type TextPart =
-  | { kind: 'text'; text: string }
-  | { kind: 'link'; target: string; label: string }
+  { kind: 'text'; text: string } | { kind: 'link'; target: string; label: string }
 
 const WIKILINK = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/g
 

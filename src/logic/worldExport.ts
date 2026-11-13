@@ -129,7 +129,8 @@ export function parseWorldExport(raw: unknown): WorldExport {
     version: CURRENT_VERSION,
     exportedAt: typeof file.exportedAt === 'string' ? file.exportedAt : '',
     world: {
-      name: typeof world.name === 'string' && world.name.trim() ? world.name.trim() : 'Imported world',
+      name:
+        typeof world.name === 'string' && world.name.trim() ? world.name.trim() : 'Imported world',
       settings: isObject(world.settings) ? world.settings : {},
       currentDay: typeof world.currentDay === 'number' ? Math.trunc(world.currentDay) : 0,
     },
@@ -185,4 +186,42 @@ export function planImport(
     plan.links.push({ ...link, from, to })
   }
   return plan
+}
+
+/** Builds the export file from the rows of one world. */
+export function buildExport(input: {
+  world: { name: string; settings: Record<string, unknown>; currentDay: number }
+  entities: Omit<ExportEntity, 'secretNotes'>[]
+  secrets: { entityId: string; notes: unknown }[]
+  links: ExportLink[]
+  now: Date
+}): WorldExport {
+  const notes = new Map(input.secrets.map((s) => [s.entityId, s.notes]))
+  return {
+    format: FORMAT,
+    version: CURRENT_VERSION,
+    exportedAt: input.now.toISOString(),
+    world: input.world,
+    entities: input.entities.map((e) => {
+      const entity: ExportEntity = {
+        id: e.id,
+        type: e.type,
+        name: e.name,
+        summary: e.summary,
+        description: e.description ?? null,
+        tags: e.tags,
+        visibility: e.visibility,
+        data: e.data,
+      }
+      const secret = notes.get(e.id)
+      if (secret) entity.secretNotes = secret
+      return entity
+    }),
+    links: input.links.map((l) => ({
+      from: l.from,
+      to: l.to,
+      label: l.label,
+      visibility: l.visibility,
+    })),
+  }
 }

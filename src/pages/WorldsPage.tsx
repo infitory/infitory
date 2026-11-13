@@ -1,12 +1,15 @@
-import { Globe, LogOut, Plus } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Globe, LogOut, Plus, Upload } from 'lucide-react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { RoleBadge } from '../components/RoleBadge'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button, Field, Logo, Notice } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import { friendlyError } from '../lib/codex'
 import { useCreateWorld, useMyWorlds } from '../lib/worlds'
+import { importAsNewWorld, readWorldFile } from '../lib/worldTransfer'
 
 export function WorldsPage() {
   const { session } = useAuth()
@@ -14,6 +17,15 @@ export function WorldsPage() {
   const worlds = useMyWorlds(session?.user.id)
   const createWorld = useCreateWorld()
   const [name, setName] = useState('')
+  const fileInput = useRef<HTMLInputElement>(null)
+  const queryClient = useQueryClient()
+  const importer = useMutation({
+    mutationFn: async (file: File) => importAsNewWorld(await readWorldFile(file)),
+    onSuccess: async (world) => {
+      await queryClient.invalidateQueries({ queryKey: ['worlds'] })
+      navigate(`/w/${world.id}`)
+    },
+  })
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -102,6 +114,40 @@ export function WorldsPage() {
             </div>
           )}
         </form>
+        <section className="mt-4 rounded-2xl border border-line bg-surface p-5 shadow-card">
+          <h2 className="font-medium">Import a world</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Have a world file exported from Loreloom? Importing creates a new world from it. Your
+            existing worlds are not touched.
+          </p>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            aria-label="Choose a world file to import"
+            tabIndex={-1}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) importer.mutate(file)
+            }}
+          />
+          <Button
+            variant="outline"
+            className="mt-3"
+            disabled={importer.isPending}
+            onClick={() => fileInput.current?.click()}
+          >
+            <Upload className="size-4" />{' '}
+            {importer.isPending ? 'Importing…' : 'Choose a world file'}
+          </Button>
+          {importer.error && (
+            <div className="mt-3">
+              <Notice tone="error">Could not import: {friendlyError(importer.error)}</Notice>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   )

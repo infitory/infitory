@@ -14,11 +14,18 @@ const BUCKET = 'entity-images'
 const path = (entity: string, file = 'portrait.png') => `${world}/${entity}/${file}`
 
 async function upload(user: string, name: string) {
-  return as(db, user, `insert into storage.objects (bucket_id, name) values ($1, $2)`, [BUCKET, name])
+  return as(db, user, `insert into storage.objects (bucket_id, name) values ($1, $2)`, [
+    BUCKET,
+    name,
+  ])
 }
 
 async function visibleFiles(user: string | null) {
-  const rows = await as<{ name: string }>(db, user, `select name from storage.objects order by name`)
+  const rows = await as<{ name: string }>(
+    db,
+    user,
+    `select name from storage.objects order by name`,
+  )
   return rows.map((r) => r.name)
 }
 
@@ -29,7 +36,9 @@ beforeAll(async () => {
   outsider = await createUser(db, 'outsider@example.com')
   otherGm = await createUser(db, 'othergm@example.com')
 
-  world = (await as<{ id: string }>(db, gm, `insert into worlds (name) values ('Aldermere') returning id`))[0].id
+  world = (
+    await as<{ id: string }>(db, gm, `insert into worlds (name) values ('Aldermere') returning id`)
+  )[0].id
   await as(db, gm, `insert into world_members (world_id, user_id) values ($1, $2)`, [world, player])
   await as(db, otherGm, `insert into worlds (name) values ('Elsewhere')`)
 
@@ -52,7 +61,12 @@ beforeAll(async () => {
 describe('page names', () => {
   it('must be unique within a world, ignoring capitals and outer spaces', async () => {
     await expect(
-      as(db, gm, `insert into entities (world_id, type, name) values ($1, 'lore', '  innkeeper BRAM ')`, [world]),
+      as(
+        db,
+        gm,
+        `insert into entities (world_id, type, name) values ($1, 'lore', '  innkeeper BRAM ')`,
+        [world],
+      ),
     ).rejects.toThrow(/unique/)
   })
 
@@ -97,16 +111,24 @@ describe('entity images', () => {
       expect(await affected(db, user, `delete from storage.objects`)).toBe(0)
     }
     await upload(gm, path(revealed, 'second.png'))
-    expect(await affected(db, gm, `delete from storage.objects where name = $1`, [path(revealed, 'second.png')])).toBe(1)
+    expect(
+      await affected(db, gm, `delete from storage.objects where name = $1`, [
+        path(revealed, 'second.png'),
+      ]),
+    ).toBe(1)
   })
 
   it('refuses uploads outside a real entity folder or into another bucket', async () => {
     await expect(upload(gm, `${world}/not-an-id/x.png`)).rejects.toThrow(/row-level security/)
     await expect(upload(gm, `x.png`)).rejects.toThrow(/row-level security/)
-    await expect(upload(gm, `${world}/${crypto.randomUUID()}/x.png`)).rejects.toThrow(/row-level security/)
+    await expect(upload(gm, `${world}/${crypto.randomUUID()}/x.png`)).rejects.toThrow(
+      /row-level security/,
+    )
     await db.exec(`insert into storage.buckets (id, name) values ('other', 'other')`)
     await expect(
-      as(db, gm, `insert into storage.objects (bucket_id, name) values ('other', $1)`, [path(revealed)]),
+      as(db, gm, `insert into storage.objects (bucket_id, name) values ('other', $1)`, [
+        path(revealed),
+      ]),
     ).rejects.toThrow(/row-level security/)
   })
 })

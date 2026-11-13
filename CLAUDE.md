@@ -30,6 +30,11 @@ Web app for a tabletop RPG game master and their players. The full scope, stack,
 - 2026-11-13 — **RLS tests run on PGlite** (in-memory Postgres) against the real migration files, with a small stub of Supabase's `auth` schema (`tests/rls/harness.ts`). No network or Supabase project needed. Every new table needs tests here.
 - 2026-11-13 — **In-world date** is `worlds.current_day`, a running integer day count; the calendar converts it.
 - 2026-11-13 — **Login** is email + password.
+- 2026-11-13 — **`[[Name]]` links are plain text** inside the rich-text JSON, resolved by name when a page is displayed (`src/logic/wikilinks.ts`, `src/components/RichTextView.tsx`). Page names are therefore unique per world (case-insensitive index). "Mentioned in" backlinks are computed client-side from descriptions. For players, a `[[Name]]` pointing at a page they cannot see renders as ordinary words.
+- 2026-11-13 — **Rich text** is TipTap JSON in a `jsonb` column; read-only display uses our own small renderer, not TipTap.
+- 2026-11-13 — **Images** live in the private `entity-images` bucket at `<world_id>/<entity_id>/<file>`, shown through signed URLs. Storage policies reuse the entities policy, so an image is visible exactly when its page is. In storage policies always write `objects.name` — a bare `name` inside an entities subquery silently means the entity's name.
+- 2026-11-13 — **Export/import** format is versioned (`src/logic/worldExport.ts`). Import always creates new ids, never overwrites, and skips pages whose name exists. Importing a file creates a new world; "Add sample content" merges `src/data/sampleWorld.ts` into the current one. Images are not in the export yet.
+- 2026-11-13 — The whole Codex of a world is loaded in one query (`useCodex`) and searched/filtered in the browser. Revisit if a world passes a few thousand pages.
 
 ## Architecture
 
@@ -50,6 +55,7 @@ Web app for a tabletop RPG game master and their players. The full scope, stack,
 ## Commands
 
 - `npm run dev` — dev server
+- Browser walkthroughs: since the container cannot reach Supabase, UI is checked with Playwright against an in-memory fake of the REST API (see the scratchpad scripts pattern: route `http://localhost:54321/**`, seed `sb-localhost-auth-token` in localStorage).
 - `npm run check` — typecheck + lint + tests (run before every commit)
 - `npm run build` — production build to `dist/`
 - `npm run format` — Prettier

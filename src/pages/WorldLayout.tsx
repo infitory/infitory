@@ -1,4 +1,4 @@
-import { ChevronsUpDown, Home, LogOut, Menu, X } from 'lucide-react'
+import { ChevronsUpDown, Home, LogOut, Menu, Settings, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams } from 'react-router'
 import { RoleBadge } from '../components/RoleBadge'
@@ -60,6 +60,11 @@ function Sidebar({
             <m.icon className="size-5" aria-hidden="true" /> {m.name}
           </NavLink>
         ))}
+        {role === 'gm' && (
+          <NavLink to={`${base}/settings`} className={navClass} onClick={onNavigate}>
+            <Settings className="size-5" aria-hidden="true" /> World settings
+          </NavLink>
+        )}
       </nav>
 
       <div className="flex items-center justify-between border-t border-line pt-3">

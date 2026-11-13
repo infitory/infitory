@@ -1,14 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { CURRENT_VERSION, FORMAT, ImportError, parseWorldExport, planImport } from './worldExport.ts'
+import {
+  buildExport,
+  CURRENT_VERSION,
+  FORMAT,
+  ImportError,
+  parseWorldExport,
+  planImport,
+} from './worldExport.ts'
 
 function file(overrides: Record<string, unknown> = {}) {
   return {
     format: FORMAT,
     version: 1,
-    exportedAt: '2026-11-13T00:00:00Z',
+    exportedAt: '2026-11-13T00:00:00.000Z',
     world: { name: 'Aldermere', settings: {}, currentDay: 12 },
     entities: [
-      { id: 'a', type: 'npc', name: 'Bram', summary: 'Innkeeper', tags: ['inn'], visibility: 'revealed', secretNotes: { type: 'doc' } },
+      {
+        id: 'a',
+        type: 'npc',
+        name: 'Bram',
+        summary: 'Innkeeper',
+        tags: ['inn'],
+        visibility: 'revealed',
+        secretNotes: { type: 'doc' },
+      },
       { id: 'b', type: 'location', name: 'Harrowgate', visibility: 'gm_only' },
       { id: 'c', type: 'faction', name: 'Ash Court' },
     ],
@@ -44,7 +59,9 @@ describe('parseWorldExport', () => {
     const parsed = parseWorldExport(file())
     expect(parsed.entities.map((e) => e.visibility)).toEqual(['revealed', 'gm_only', 'gm_only'])
     expect(parsed.links.map((l) => l.visibility)).toEqual(['revealed', 'gm_only'])
-    const odd = parseWorldExport(file({ entities: [{ id: 'a', type: 'npc', name: 'X', visibility: 'public' }] }))
+    const odd = parseWorldExport(
+      file({ entities: [{ id: 'a', type: 'npc', name: 'X', visibility: 'public' }] }),
+    )
     expect(odd.entities[0].visibility).toBe('gm_only')
   })
 
@@ -61,8 +78,12 @@ describe('parseWorldExport', () => {
   })
 
   it('rejects pages with no name, unknown type or duplicate names', () => {
-    expect(() => parseWorldExport(file({ entities: [{ id: 'a', type: 'npc', name: ' ' }] }))).toThrow(/no name/)
-    expect(() => parseWorldExport(file({ entities: [{ id: 'a', type: 'dragon', name: 'X' }] }))).toThrow(/unknown type/)
+    expect(() =>
+      parseWorldExport(file({ entities: [{ id: 'a', type: 'npc', name: ' ' }] })),
+    ).toThrow(/no name/)
+    expect(() =>
+      parseWorldExport(file({ entities: [{ id: 'a', type: 'dragon', name: 'X' }] })),
+    ).toThrow(/unknown type/)
     expect(() =>
       parseWorldExport(
         file({
@@ -78,12 +99,7 @@ describe('parseWorldExport', () => {
   it('drops links that point outside the file or at themselves', () => {
     const parsed = parseWorldExport(
       file({
-        links: [
-          { from: 'a', to: 'zzz' },
-          { from: 'a', to: 'a' },
-          'junk',
-          { from: 'a', to: 'b' },
-        ],
+        links: [{ from: 'a', to: 'zzz' }, { from: 'a', to: 'a' }, 'junk', { from: 'a', to: 'b' }],
       }),
     )
     expect(parsed.links).toEqual([{ from: 'a', to: 'b', label: '', visibility: 'gm_only' }])
@@ -119,5 +135,19 @@ describe('planImport', () => {
     expect(plan.entities).toEqual([])
     expect(plan.links).toEqual([])
     expect(plan.skipped).toHaveLength(3)
+  })
+})
+
+describe('buildExport', () => {
+  it('produces a file that imports back to the same content', () => {
+    const parsed = parseWorldExport(file())
+    const built = buildExport({
+      world: parsed.world,
+      entities: parsed.entities.map(({ secretNotes: _s, ...e }) => e),
+      secrets: [{ entityId: 'a', notes: { type: 'doc' } }],
+      links: parsed.links,
+      now: new Date('2026-11-13T00:00:00Z'),
+    })
+    expect(parseWorldExport(JSON.parse(JSON.stringify(built)))).toEqual(parsed)
   })
 })

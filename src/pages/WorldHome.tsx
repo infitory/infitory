@@ -29,9 +29,11 @@ export function WorldHome() {
               <span className="min-w-0">
                 <span className="flex flex-wrap items-center gap-2 font-medium">
                   {m.name}
-                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-normal text-ink-soft">
-                    Coming soon
-                  </span>
+                  {!m.ready && (
+                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-normal text-ink-soft">
+                      Coming soon
+                    </span>
+                  )}
                 </span>
                 <span className="mt-1 block text-sm text-ink-soft">{m.blurb}</span>
               </span>
