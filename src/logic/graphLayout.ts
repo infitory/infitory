@@ -38,11 +38,11 @@ export function layoutGraph(nodeIds: string[], edges: GraphEdge[]): Map<string, 
       'link',
       forceLink<SimNode, SimulationLinkDatum<SimNode>>(links)
         .id((n) => n.id)
-        .distance(150)
+        .distance(190)
         .strength(0.5),
     )
-    .force('charge', forceManyBody().strength(-520))
-    .force('collide', forceCollide(58))
+    .force('charge', forceManyBody().strength(-900))
+    .force('collide', forceCollide(70))
     .force('center', forceCenter(0, 0))
     .stop()
 

@@ -1,24 +1,46 @@
-import { ArrowLeft, Maximize, Minus, Plus } from 'lucide-react'
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { ArrowLeft, Maximize, Minus, Plus, RotateCcw } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { ENTITY_TYPE_LIST, ENTITY_TYPES } from '../../lib/entityTypes'
 import type { EntityType } from '../../lib/types'
-import { bounds, layoutGraph } from '../../logic/graphLayout'
+import { bounds, layoutGraph, type Point } from '../../logic/graphLayout'
 import { useCodex } from './useCodex'
 
 const NODE_RADIUS = 20
+
+type Positions = Record<string, Point>
+
+/** Where you dragged the dots to, remembered in this browser for each world. */
+function loadPositions(key: string): Positions {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? '{}')
+    return typeof parsed === 'object' && parsed !== null ? (parsed as Positions) : {}
+  } catch {
+    return {}
+  }
+}
 
 function shorten(text: string, max: number) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
 export function RelationshipMap() {
-  const { entities, links, codexPath, isLoading, isGm } = useCodex()
+  const { entities, links, codexPath, isLoading, isGm, world } = useCodex()
   const navigate = useNavigate()
   const [hiddenTypes, setHiddenTypes] = useState<Set<EntityType>>(new Set())
   const [linkedOnly, setLinkedOnly] = useState(true)
   const [view, setView] = useState({ x: 0, y: 0, k: 1 })
-  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null)
+  const drag = useRef<{ x: number; y: number; moved: boolean; nodeId?: string } | null>(null)
+  const storageKey = `loreloom-map-${world.id}`
+  const [moved, setMoved] = useState<Positions>(() => loadPositions(storageKey))
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(moved))
+    } catch {
+      // Private browsing: the arrangement just won't be remembered.
+    }
+  }, [moved, storageKey])
   const svgRef = useRef<SVGSVGElement>(null)
 
   const graph = useMemo(() => {
@@ -35,6 +57,8 @@ export function RelationshipMap() {
   }, [entities, links, hiddenTypes, linkedOnly])
 
   const { box } = graph
+  /** A dot's place: where you dragged it, or else where the automatic layout put it. */
+  const at = (id: string): Point => moved[id] ?? graph.layout.get(id)!
 
   /** How many map units one screen pixel is, so dragging follows the finger. */
   function unitsPerPixel() {
@@ -57,6 +81,19 @@ export function RelationshipMap() {
     d.x = e.clientX
     d.y = e.clientY
     const scale = unitsPerPixel()
+    const nodeId = d.nodeId
+    if (nodeId) {
+      // Moving one dot: undo the zoom so it stays under the pointer.
+      const start = at(nodeId)
+      setMoved((m) => {
+        const from = m[nodeId] ?? start
+        return {
+          ...m,
+          [nodeId]: { x: from.x + (dx * scale) / view.k, y: from.y + (dy * scale) / view.k },
+        }
+      })
+      return
+    }
     setView((v) => ({ ...v, x: v.x + dx * scale, y: v.y + dy * scale }))
   }
   function onPointerUp() {
@@ -90,7 +127,8 @@ export function RelationshipMap() {
       </Link>
       <h1 className="mt-3 text-3xl font-semibold tracking-tight">Relationship map</h1>
       <p className="mt-1 text-sm text-ink-soft">
-        Drag to move around, click a dot to open its page.
+        Drag a dot to rearrange the map, drag the background to move around, click a dot to open its
+        page.
         {isGm && ' Dashed lines and rings are hidden from players.'}
       </p>
 
@@ -167,8 +205,8 @@ export function RelationshipMap() {
               transform={`translate(${view.x} ${view.y}) translate(${cx} ${cy}) scale(${view.k}) translate(${-cx} ${-cy})`}
             >
               {graph.edges.map((l) => {
-                const a = graph.layout.get(l.from_id)!
-                const b = graph.layout.get(l.to_id)!
+                const a = at(l.from_id)
+                const b = at(l.to_id)
                 const length = Math.hypot(b.x - a.x, b.y - a.y) || 1
                 const ux = (b.x - a.x) / length
                 const uy = (b.y - a.y) / length
@@ -203,7 +241,7 @@ export function RelationshipMap() {
                 )
               })}
               {graph.nodes.map((n) => {
-                const p = graph.layout.get(n.id)!
+                const p = at(n.id)
                 const info = ENTITY_TYPES[n.type]
                 const Icon = info.icon
                 return (
@@ -214,6 +252,10 @@ export function RelationshipMap() {
                     tabIndex={0}
                     aria-label={`${n.name}, ${info.label}${n.visibility === 'gm_only' ? ', hidden from players' : ''}`}
                     className="cursor-pointer outline-none [&:focus-visible>circle]:stroke-(--accent) [&:focus-visible>circle]:[stroke-width:3]"
+                    onPointerDown={(e) => {
+                      e.stopPropagation()
+                      drag.current = { x: e.clientX, y: e.clientY, moved: false, nodeId: n.id }
+                    }}
                     onClick={() => open(n.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -264,6 +306,7 @@ export function RelationshipMap() {
               [Plus, 'Zoom in', () => zoom(1.25)],
               [Minus, 'Zoom out', () => zoom(0.8)],
               [Maximize, 'Reset the view', () => setView({ x: 0, y: 0, k: 1 })],
+              [RotateCcw, 'Put the dots back automatically', () => setMoved({})],
             ] as const
           ).map(([Icon, label, action]) => (
             <button
