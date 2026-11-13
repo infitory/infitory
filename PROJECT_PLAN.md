@@ -206,7 +206,7 @@ Each phase: create the branch → present the plan → build with commits → ru
 Claude Code: tick items and add a one-line dated note as phases complete.
 
 - [x] Kickoff questions answered
-- [ ] Phase 0 — Foundation
+- [x] Phase 0 — Foundation
 - [ ] Phase 1 — World Codex
 - [ ] Phase 1.5 — First deployment (Infomaniak)
 - [ ] Phase 2 — Calendar
@@ -218,3 +218,4 @@ Claude Code: tick items and add a one-line dated note as phases complete.
 
 Notes:
 - 2026-11-13 — Kickoff done; answers recorded in CLAUDE.md. Old repository contents cleared.
+- 2026-11-13 — Phase 0 done: scaffold, schema + RLS (19 passing security tests), login, multi-world shell. Tested by the user against the dev Supabase project.

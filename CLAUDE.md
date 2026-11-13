@@ -13,6 +13,13 @@ Web app for a tabletop RPG game master and their players. The full scope, stack,
 - **Domain name:** none yet (needed at Phase 1.5)
 - **Multiple worlds/campaigns:** wanted later — every table is scoped by `world_id` and roles are per world from the start
 
+## Working with this user
+
+- The user runs the app on their own **Windows** PC (PowerShell) from `C:\Users\Mael\infitory`; the cloud session's preview is not visible to them. To try new work they run `git pull`, then `npm.cmd install` (if dependencies changed) and `npm.cmd run dev`. PowerShell blocks `npm`, so always write **`npm.cmd`** in instructions.
+- New migrations are applied by the user pasting the file into the Supabase **SQL Editor** (link them to the file on GitHub). Tell them exactly which file, once.
+- The cloud container cannot reach `*.supabase.co`; verify database behaviour with the PGlite tests.
+- **Dev Supabase project:** `loreloom-dev`, URL `https://pyonmuneplivatpyavad.supabase.co`. "Confirm email" is turned off there (keep it on for prod). The publishable key is in the user's local `.env`.
+
 ## Decisions
 
 - 2026-11-13 — The repository's previous contents (an old static "TTRPG Manager" page and an unrelated `trieur-fichiers` tool) were removed at the user's request. They remain in Git history before the `phase-0-foundation` branch.
